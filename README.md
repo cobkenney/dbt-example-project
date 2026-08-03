@@ -1,2 +1,2 @@
 # dbt-example-project
-Example dbt project
+This repository contains an example dbt project for a rental property management company.
