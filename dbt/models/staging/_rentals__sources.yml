@@ -1,0 +1,88 @@
+version: 2
+
+sources:
+  - name: rentals
+    description: >
+      Raw Airbnb-style rental data loaded from CSV into Snowflake.
+      Landed as-is — no cleaning applied. Staging models are responsible
+      for casting and deduplication.
+    database: RENTALS
+    schema: RAW_DATA
+
+    tables:
+      - name: listings
+        description: One row per rental property listing, with host attributes denormalized onto it.
+        columns:
+          - name: id
+            description: Listing identifier. Natural key, but 2 rows land with a NULL id.
+            data_tests:
+              - unique
+              - not_null:
+                  config:
+                    severity: warn
+          - name: host_id
+            description: Identifier of the host who owns this listing.
+          - name: room_type
+            description: Either "Entire home/apt" or "Private room".
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ["Entire home/apt", "Private room"]
+          - name: price
+            description: Nightly price as a currency string, e.g. "$125.00". Cast downstream.
+          - name: accommodates
+            description: Maximum number of guests.
+          - name: review_scores_rating
+            description: Average review score.
+
+      - name: calendar
+        description: One row per listing per date, giving availability and nightly price.
+        columns:
+          - name: listing_id
+            description: References listings.id. 365 rows point at listing 276450, which is absent from listings.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('rentals', 'listings')
+                    field: id
+                  config:
+                    severity: warn
+          - name: date
+            description: Calendar date the availability applies to. Spans 2021-07-12 to 2022-07-11.
+            data_tests:
+              - not_null
+          - name: available
+            description: Whether the listing is bookable on this date.
+          - name: price
+            description: Nightly price as a plain numeric string, e.g. "125" — no currency symbol, unlike listings.price.
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: [listing_id, date]
+              config:
+                severity: warn
+
+      - name: amenities_changelog
+        description: Event log of amenity changes per listing. One row per listing per change timestamp.
+        columns:
+          - name: listing_id
+            description: References listings.id. 2 rows point at listing 276450, which is absent from listings.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('rentals', 'listings')
+                    field: id
+                  config:
+                    severity: warn
+          - name: change_at
+            description: When the amenity set changed.
+            data_tests:
+              - not_null
+          - name: amenities
+            description: Amenity list as a raw string.
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: [listing_id, change_at]

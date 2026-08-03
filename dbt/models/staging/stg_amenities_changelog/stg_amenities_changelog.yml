@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: stg_amenities_changelog
+    description: Event log of amenity changes, one row per listing per change timestamp.
+    columns:
+      - name: amenities_change_id
+        description: Surrogate key over (listing_id, changed_at).
+        data_tests:
+          - unique
+          - not_null
+      - name: listing_id
+        description: >
+          References stg_listings.listing_id. 2 rows reference the missing
+          listing 276450 — warns rather than errors.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_listings')
+                field: listing_id
+              config:
+                severity: warn
+      - name: changed_at
+        description: When the amenity set changed.
+        data_tests:
+          - not_null

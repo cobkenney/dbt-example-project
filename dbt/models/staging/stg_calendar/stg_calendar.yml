@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: stg_calendar
+    description: >
+      One row per listing per date. Deduplicated on (listing_id, calendar_date)
+      to fix a triplicated source row.
+    columns:
+      - name: calendar_id
+        description: Surrogate key over (listing_id, calendar_date).
+        data_tests:
+          - unique
+          - not_null
+      - name: listing_id
+        description: >
+          References stg_listings.listing_id. 365 rows reference listing 276450,
+          which is absent from listings — warns rather than errors.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_listings')
+                field: listing_id
+              config:
+                severity: warn
+      - name: calendar_date
+        description: Date the availability applies to. Spans 2021-07-12 to 2022-07-11.
+        data_tests:
+          - not_null
+      - name: is_available
+        description: True when the listing is bookable on this date.
+        data_tests:
+          - not_null
+      - name: reservation_id
+        description: >
+          Null when the date is available. The raw column stores the literal
+          string 'NULL' for these, converted to a true NULL here.
+      - name: price
+        description: Nightly price in dollars, cast from a plain numeric string.
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [listing_id, calendar_date]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "not (is_available and reservation_id is not null)"

@@ -427,3 +427,18 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ---- dbt ----
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Python virtual environment
+.venv/
+
+# Local credentials (never commit)
+.env
+
+# Claude local settings
+.claude/settings.local.json

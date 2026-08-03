@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        # dbt yml files can contain Jinja that stock YAML parsers reject.
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  - repo: local
+    hooks:
+      - id: sqlfluff-lint
+        name: sqlfluff lint (dbt models)
+        description: >
+          Enforce the dbt SQL style guide — lowercase keywords, identifiers,
+          and functions — on staged model SQL.
+        entry: scripts/sqlfluff-lint-staged.sh
+        language: script
+        files: ^dbt/models/.*\.sql$
+        pass_filenames: true
+        require_serial: true

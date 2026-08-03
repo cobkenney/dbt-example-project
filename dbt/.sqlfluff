@@ -1,0 +1,54 @@
+[sqlfluff]
+templater = dbt
+dialect = snowflake
+max_line_length = 80
+
+# LT08: blank line after CTE closing bracket — conflicts with the compact
+#       CTE style used across these models.
+# ST06: enforces a strict select-clause column order (wildcards, simple, complex)
+#       which fights the source-column ordering staging models preserve.
+exclude_rules = LT08, ST06
+
+[sqlfluff:templater:dbt]
+project_dir = ./
+profiles_dir = ./
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indented_joins = false
+indented_ctes = false
+
+# dbt style guide: "Field names, keywords, and function names should all be
+# lowercase." https://docs.getdbt.com/best-practices/how-we-style/2-how-we-style-our-sql
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:aliasing.table]
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.column]
+aliasing = explicit
+
+# Snowflake upcases unquoted identifiers, so references to raw tables and
+# columns are legitimately uppercase — don't flag them.
+[sqlfluff:rules:references.quoting]
+prefer_quoted_identifiers = false
+
+[sqlfluff:rules:ambiguous.column_references]
+group_by_and_order_by_style = implicit
+
+[sqlfluff:rules:convention.count_rows]
+prefer_count_1 = false
+prefer_count_0 = false
