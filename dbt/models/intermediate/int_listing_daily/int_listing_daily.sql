@@ -1,8 +1,4 @@
 -- One row per listing per date — the daily grain the marts aggregate from.
---
--- Left joins are deliberate. Listing 276450 appears in the calendar but not
--- in listings, and inner joining silently drops its 365 rows and $2,200 of
--- booked revenue, which visibly skews revenue-share splits.
 with calendar as (
 
     select * from {{ ref('stg_calendar') }}
@@ -55,6 +51,7 @@ joined as (
         amenities.amenity_count
 
     from calendar
+    -- Left, not inner: an inner join drops listings with no bookings
     left join listings on calendar.listing_id = listings.listing_id
     left join amenities on calendar.listing_id = amenities.listing_id
 

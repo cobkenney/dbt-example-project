@@ -1,0 +1,101 @@
+version: 2
+
+models:
+  - name: fct_listing_availability_windows
+    description: >
+      One row per contiguous availability window per listing, with amenity
+      flags for filtering. Answers "what is the longest possible stay for
+      listings with amenity X".
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: availability_window_id
+        description: >
+          {{ doc('availability_window_id') }}
+
+          Primary key here.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          Foreign key to dim_listings.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_listings')
+                field: listing_id
+
+      - name: window_start_date
+        description: "{{ doc('window_start_date') }}"
+        data_tests:
+          - not_null
+
+      - name: window_end_date
+        description: "{{ doc('window_end_date') }}"
+        data_tests:
+          - not_null
+
+      - name: window_length_nights
+        description: "{{ doc('window_length_nights') }}"
+        data_tests:
+          - not_null
+
+      - name: minimum_nights
+        description: "{{ doc('minimum_nights') }}"
+
+      - name: maximum_nights
+        description: "{{ doc('maximum_nights') }}"
+
+      - name: longest_possible_stay_nights
+        description: "{{ doc('longest_possible_stay_nights') }}"
+        data_tests:
+          - not_null
+
+      - name: is_bookable_window
+        description: >
+          False when the window is shorter than the owner's minimum_nights, so
+          no stay could actually be booked in it. Filter on this before
+          reporting window counts as bookable inventory.
+        data_tests:
+          - not_null
+
+      - name: listing_name
+        description: "{{ doc('listing_name') }}"
+
+      - name: neighborhood
+        description: "{{ doc('neighborhood') }}"
+
+      - name: property_type
+        description: "{{ doc('property_type') }}"
+
+      - name: room_type
+        description: "{{ doc('room_type') }}"
+
+      - name: has_air_conditioning
+        description: "{{ doc('has_air_conditioning') }}"
+
+      - name: has_lockbox
+        description: "{{ doc('has_lockbox') }}"
+        data_tests:
+          - not_null
+
+      - name: has_first_aid_kit
+        description: "{{ doc('has_first_aid_kit') }}"
+        data_tests:
+          - not_null
+
+      - name: amenity_count
+        description: "{{ doc('amenity_count') }}"
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              longest_possible_stay_nights <= window_length_nights
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('int_listing_availability_windows')

@@ -29,12 +29,31 @@ clean-targets:         # directories to be removed by `dbt clean`
 # In this example config, we tell dbt to build all models in the example/
 # directory as views. These settings can be overridden in the individual model
 # files using the `{{ config(...) }}` macro.
+# Each layer lands in its own schema (analytics_stg / analytics_int, and one
+# schema per mart) so access can be granted per schema — analysts get core_mart,
+# and the layers behind it stay closed. macros/generate_schema_name.sql turns
+# the `+schema:` values below into bare names in prod and developer-prefixed
+# names everywhere else.
 models:
   rentals:
+    # Push the descriptions in the model .yml files into Snowflake's own
+    # COMMENT fields, so they show up in SQL clients and BI tools instead of
+    # living only in dbt. Set at the project root because it applies to every
+    # layer. The custom mart materialization already calls persist_docs — this
+    # config is what makes that call do anything.
+    +persist_docs:
+      relation: true
+      columns: true
+
     staging:
       # Staging models are thin renaming/casting layers — views keep them
       # cheap and always current.
       +materialized: view
+      +schema: analytics_stg
+      +meta:
+        layer: staging
+        owner: analytics-eng
+        audience: internal
     intermediate:
       # Tables, with no per-model exceptions — one rule for the whole layer.
       #
@@ -42,9 +61,10 @@ models:
       # models. Ephemeral inlines the logic as a CTE in every consumer, which
       # re-runs it per consumer and keeps it out of the warehouse entirely;
       # int_amenities_current and int_listing_daily each have two consumers, so
-      # tables trade a little storage for building that work once. The tradeoff
-      # is the models are queryable, which is why the marts layer — not this
-      # one — is what analysts are pointed at.
+      # tables trade a little storage for building that work once. Being
+      # queryable is also what lets this layer carry its own tests, which
+      # ephemeral models cannot. Analysts are still pointed at core_mart —
+      # now enforced by grants rather than convention.
       +materialized: table
 
       # dbt-snowflake defaults every table to `transient`, which caps Time
@@ -53,7 +73,17 @@ models:
       # a transient table. Costs fail-safe storage (7 days, billable, not
       # configurable) in exchange for being able to inspect prior state.
       +transient: false
+      +schema: analytics_int
+      +meta:
+        layer: intermediate
+        owner: analytics-eng
+        audience: internal
     marts:
+      # A container, not a layer: each subfolder is one mart with its own
+      # schema, so a future finance_mart/ or growth_mart/ can be granted
+      # separately from core_mart. Settings that should hold for every mart live
+      # here; only `+schema:` belongs to the individual mart below.
+      #
       # Tables analysts query, built with a custom materialization that emits
       # `insert overwrite into ... select` instead of `create or replace`.
       #
@@ -62,8 +92,32 @@ models:
       # Overwriting rows in place keeps the object, so analysts can ask what a
       # mart looked like before it last updated. See
       # macros/table_insert_overwrite.sql.
-      #
-      # Left transient (the dbt-snowflake default), so Time Travel here is
-      # capped at 1 day. That covers "before the last build" for a daily
-      # schedule but nothing older; set +transient: false to raise it.
       +materialized: table_insert_overwrite
+
+      # Permanent, overriding the dbt-snowflake default of transient. Transient
+      # caps Time Travel at 1 day and forgoes fail-safe; permanent makes
+      # data_retention_time_in_days settable, which is what lets the window
+      # reach back further than the last build. Costs fail-safe storage
+      # (7 days, billable, not configurable). Same rationale as the
+      # intermediate layer above.
+      #
+      # NOTE: this alone does not extend Time Travel — the account default
+      # retention is 1 day, so these tables stay at 1 day until
+      # +data_retention_time_in_days is also set.
+      +transient: false
+
+      # `audience: analysts` is the one field that differs from the layers
+      # behind this one — it marks what is meant to be consumed directly,
+      # matching the grants story. meta is documentation only; dbt never
+      # enforces it.
+      +meta:
+        layer: marts
+        owner: analytics-eng
+        audience: analysts
+
+      core_mart:
+        # The general-purpose mart. Folder and schema share a name so the
+        # mapping is obvious, and future marts can follow the same convention
+        # (finance_mart/ -> finance_mart). Each mart declares only its own
+        # +schema and inherits the settings above.
+        +schema: core_mart

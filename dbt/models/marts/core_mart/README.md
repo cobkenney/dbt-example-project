@@ -1,9 +1,17 @@
-# Marts layer
+# `core_mart`
 
-Three models analysts query directly. All materialized as tables (`marts:
-+materialized: table` in `dbt_project.yml`) — marts are read many times and the
-underlying data is a fixed one-year snapshot, so paying the build cost once is
-the right trade.
+The general-purpose mart: three models analysts query directly. Built into the
+`core_mart` schema — folder and schema share a name — and this is the only
+schema analysts are granted on. See `macros/generate_schema_name.sql`.
+
+`models/marts/` is a container rather than a layer. Each subfolder is one mart
+with its own schema, so a future mart can be granted separately from this one.
+Materialization and `+transient` are set once on `marts:` in `dbt_project.yml`
+and inherited; each mart declares only its own `+schema:`.
+
+All materialized as tables (`table_insert_overwrite`) — marts are read many
+times and the underlying data is a fixed one-year snapshot, so paying the build
+cost once is the right trade.
 
 No cleaning or casting happens here. Everything is typed and deduplicated by
 the time it reaches this layer — see [staging](../staging/README.md) for the

@@ -5,14 +5,19 @@ models:
     description: >
       One row per listing per date. Deduplicated on (listing_id, calendar_date)
       to fix a triplicated source row.
+    config:
+      tags: ['1x_day']
     columns:
       - name: calendar_id
-        description: Surrogate key over (listing_id, calendar_date).
+        description: "{{ doc('calendar_id') }}"
         data_tests:
           - unique
           - not_null
+
       - name: listing_id
         description: >
+          {{ doc('listing_id') }}
+
           References stg_listings.listing_id. 365 rows reference listing 276450,
           which is absent from listings — warns rather than errors.
         data_tests:
@@ -23,22 +28,30 @@ models:
                 field: listing_id
               config:
                 severity: warn
+
       - name: calendar_date
-        description: Date the availability applies to. Spans 2021-07-12 to 2022-07-11.
+        description: "{{ doc('calendar_date') }}"
         data_tests:
           - not_null
+
       - name: is_available
-        description: True when the listing is bookable on this date.
+        description: "{{ doc('is_available') }}"
         data_tests:
           - not_null
+
       - name: reservation_id
-        description: >
-          Null when the date is available. The raw column stores the literal
-          string 'NULL' for these, converted to a true NULL here.
+        description: "{{ doc('reservation_id') }}"
+
       - name: price
-        description: Nightly price in dollars, cast from a plain numeric string.
+        description: "{{ doc('nightly_price') }}"
         data_tests:
           - not_null
+
+      - name: minimum_nights
+        description: "{{ doc('minimum_nights') }}"
+
+      - name: maximum_nights
+        description: "{{ doc('maximum_nights') }}"
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:

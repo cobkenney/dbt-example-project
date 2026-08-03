@@ -13,3 +13,18 @@ rentals:
       database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
       schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
       threads: 8
+
+    # Only `prod` gets the bare schema names (analytics_stg / analytics_int /
+    # core_mart) that grants are written against — see
+    # macros/generate_schema_name.sql. The `schema` below is the fallback for
+    # models with no `+schema:` config; layer models ignore it.
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      schema: core_mart
+      threads: 8

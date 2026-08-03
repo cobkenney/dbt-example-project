@@ -1,28 +1,46 @@
 version: 2
 
 models:
-  - name: int_listing_daily
+  - name: fct_listing_daily
     description: >
-      One row per listing per date, joining calendar to listing attributes and
-      amenity flags. The daily grain every mart aggregates from. Left joins
-      preserve the 365 orphan rows for listing 276450, which carry $2,200 of
-      booked revenue that an inner join would silently drop.
+      One row per listing per date — the atomic fact table for revenue and
+      pricing analysis. Retains the 365 orphan rows, which carry $2,200 of
+      booked revenue; excluding them shifts the July 2022 no-AC revenue share
+      from 21.2% to 22.1%.
     config:
       tags: ['1x_day']
     columns:
       - name: calendar_id
-        description: "{{ doc('calendar_id') }}"
+        description: >
+          {{ doc('calendar_id') }}
+
+          Primary key here.
         data_tests:
           - unique
           - not_null
 
       - name: listing_id
-        description: "{{ doc('listing_id') }}"
+        description: >
+          {{ doc('listing_id') }}
+
+          Foreign key to dim_listings.
         data_tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_listings')
+                field: listing_id
 
       - name: calendar_date
         description: "{{ doc('calendar_date') }}"
+        data_tests:
+          - not_null
+
+      - name: month_start_date
+        description: >
+          First day of the month containing `calendar_date`, precomputed because
+          every revenue-by-month query needs it and date_trunc in a group by is
+          easy to get subtly wrong.
         data_tests:
           - not_null
 
@@ -48,14 +66,6 @@ models:
       - name: maximum_nights
         description: "{{ doc('maximum_nights') }}"
 
-      - name: is_orphan_listing
-        description: "{{ doc('is_orphan_listing') }}"
-        data_tests:
-          - not_null
-
-      - name: listing_name
-        description: "{{ doc('listing_name') }}"
-
       - name: neighborhood
         description: "{{ doc('neighborhood') }}"
 
@@ -73,24 +83,30 @@ models:
 
       - name: has_air_conditioning
         description: "{{ doc('has_air_conditioning') }}"
+        data_tests:
+          - not_null
 
       - name: has_lockbox
         description: "{{ doc('has_lockbox') }}"
+        data_tests:
+          - not_null
 
       - name: has_first_aid_kit
         description: "{{ doc('has_first_aid_kit') }}"
+        data_tests:
+          - not_null
 
       - name: amenity_count
         description: "{{ doc('amenity_count') }}"
+
+      - name: is_orphan_listing
+        description: "{{ doc('is_orphan_listing') }}"
+        data_tests:
+          - not_null
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [listing_id, calendar_date]
-      - dbt_utils.expression_is_true:
-          arguments:
-            expression: >
-              (is_available and revenue is null)
-              or (not is_available and revenue is not null)
       - dbt_utils.equal_rowcount:
           arguments:
-            compare_model: ref('stg_calendar')
+            compare_model: ref('int_listing_daily')

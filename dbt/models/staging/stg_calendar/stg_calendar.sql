@@ -1,6 +1,5 @@
--- One row per listing per date. The raw table has 1 triplicated row
--- (listing 1303261 on 2022-07-07, fully identical), so dedupe to restore
--- the grain before anything downstream aggregates on it.
+-- One row per listing per date. Deduped because the raw table
+-- can have duplicates
 with deduplicated as (
 
     {{ dbt_utils.deduplicate(

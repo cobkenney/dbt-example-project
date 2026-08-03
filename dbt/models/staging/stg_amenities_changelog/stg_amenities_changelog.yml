@@ -3,14 +3,19 @@ version: 2
 models:
   - name: stg_amenities_changelog
     description: Event log of amenity changes, one row per listing per change timestamp.
+    config:
+      tags: ['1x_day']
     columns:
       - name: amenities_change_id
         description: Surrogate key over (listing_id, changed_at).
         data_tests:
           - unique
           - not_null
+
       - name: listing_id
         description: >
+          {{ doc('listing_id') }}
+
           References stg_listings.listing_id. 2 rows reference the missing
           listing 276450 — warns rather than errors.
         data_tests:
@@ -21,7 +26,20 @@ models:
                 field: listing_id
               config:
                 severity: warn
+
       - name: changed_at
-        description: When the amenity set changed.
+        description: >
+          When the amenity set changed. Two events per listing, the latest
+          being 2021-07-06 — every event predates the 2021-07-12 calendar
+          opening, which is what lets int_amenities_current collapse to the
+          most recent event.
         data_tests:
           - not_null
+
+      - name: amenities
+        description: >
+          {{ doc('amenities_json') }}
+
+          Each row holds the listing's complete amenity set as of `changed_at`,
+          a snapshot rather than a delta — so building an SCD2 view of this
+          would need only valid_from/valid_to, no reconstruction.

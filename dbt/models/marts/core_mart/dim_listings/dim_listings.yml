@@ -1,0 +1,176 @@
+version: 2
+
+models:
+  - name: dim_listings
+    description: >
+      One row per listing with descriptive attributes, amenity flags, and
+      lifetime performance measures. Grain covers all 50 listings the calendar
+      references, including the one missing from the raw listings table.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          Primary key here.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: listing_name
+        description: "{{ doc('listing_name') }}"
+
+      - name: neighborhood
+        description: "{{ doc('neighborhood') }}"
+
+      - name: property_type
+        description: "{{ doc('property_type') }}"
+
+      - name: room_type
+        description: "{{ doc('room_type') }}"
+
+      - name: accommodates
+        description: "{{ doc('accommodates') }}"
+
+      - name: bedrooms
+        description: Number of bedrooms. NULL for the orphan listing or where the host left it unset.
+
+      - name: beds
+        description: Number of beds, which may exceed `bedrooms` for multi-bed rooms.
+
+      - name: bathrooms
+        description: >
+          Numeric bathroom count parsed from the raw free-text label, ranging
+          1.0-2.5. Does not indicate whether the bathroom is shared — see
+          `is_shared_bathroom`.
+
+      - name: is_shared_bathroom
+        description: >
+          True when the raw bathroom label mentions "shared". Not reflected in
+          the `bathrooms` count, so this is the only signal for it.
+
+      - name: number_of_reviews
+        description: Lifetime review count. Zero for listings that have never been reviewed.
+
+      - name: review_scores_rating
+        description: Average review score. NULL for listings with no reviews.
+
+      - name: first_review_date
+        description: Date of the earliest review. NULL for listings with no reviews.
+
+      - name: last_review_date
+        description: Date of the most recent review. NULL for listings with no reviews.
+
+      - name: host_id
+        description: "{{ doc('host_id') }}"
+
+      - name: host_name
+        description: >
+          Display name of the host. Not unique — one host may hold several
+          listings. NULL for the orphan listing.
+
+      - name: host_since
+        description: Date the host joined the platform. NULL for the orphan listing.
+
+      - name: host_location
+        description: >
+          Self-reported host location, free text and not normalized. Not
+          comparable to `neighborhood`, which describes the listing. NULL for
+          the orphan listing.
+
+      - name: list_price
+        description: >
+          Host's advertised nightly rate from the listings table.
+
+          This is the list price, not what was actually charged or earned — see
+          `avg_nightly_price` for the calendar-based rate and `total_revenue`
+          for realized revenue. NULL for the orphan listing.
+
+      - name: amenity_count
+        description: "{{ doc('amenity_count') }}"
+
+      - name: has_air_conditioning
+        description: "{{ doc('has_air_conditioning') }}"
+        data_tests:
+          - not_null
+
+      - name: has_lockbox
+        description: "{{ doc('has_lockbox') }}"
+        data_tests:
+          - not_null
+
+      - name: has_first_aid_kit
+        description: "{{ doc('has_first_aid_kit') }}"
+        data_tests:
+          - not_null
+
+      - name: has_wifi
+        description: "{{ doc('has_wifi') }}"
+
+      - name: has_heating
+        description: "{{ doc('has_heating') }}"
+
+      - name: has_kitchen
+        description: "{{ doc('has_kitchen') }}"
+
+      - name: calendar_days
+        description: >
+          Days the listing appears in the calendar. 365 for every listing, since
+          the source is a fixed one-year snapshot — so it is the denominator of
+          `occupancy_rate` rather than a measure of listing age.
+
+      - name: booked_nights
+        description: Nights booked across the calendar window.
+        data_tests:
+          - not_null
+
+      - name: available_nights
+        description: >
+          Nights still available across the calendar window. Together with
+          `booked_nights` this sums to `calendar_days`, which the model-level
+          test asserts.
+
+      - name: total_revenue
+        description: >
+          Sum of nightly price across booked nights.
+
+          Zero, not NULL, for the 3 listings that were never booked — `sum()`
+          over all-NULL revenue returns NULL, which is coalesced to 0 as the
+          honest measure.
+        data_tests:
+          - not_null
+
+      - name: avg_nightly_price
+        description: >
+          Mean nightly price across all calendar dates, booked or not. This is
+          the rate the listing was offered at, not the rate it achieved — divide
+          `total_revenue` by `booked_nights` for that.
+
+      - name: min_nightly_price
+        description: Lowest nightly price across the calendar window.
+
+      - name: max_nightly_price
+        description: Highest nightly price across the calendar window.
+
+      - name: occupancy_rate
+        description: >
+          booked_nights / calendar_days, using div0 so a listing with no
+          calendar rows yields 0 rather than erroring. Ranges 0-1.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+                inclusive: true
+
+      - name: is_orphan_listing
+        description: "{{ doc('is_orphan_listing') }}"
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              booked_nights + available_nights = calendar_days

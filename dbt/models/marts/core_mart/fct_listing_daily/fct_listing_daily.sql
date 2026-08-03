@@ -1,11 +1,6 @@
--- One row per listing per date — the atomic fact table.
---
--- Answers the amenity-revenue and neighborhood-pricing questions directly.
--- Kept at daily grain rather than pre-aggregated by month so it can serve
--- both, plus anything else time-sliced.
---
--- month_start_date is precomputed because every revenue-by-month query needs
--- it, and date_trunc in a group by is easy to get subtly wrong.
+-- One row per listing per date — the atomic fact table. Left at daily grain
+-- rather than pre-aggregated by month so it serves both revenue-by-month and
+-- point-in-time price questions.
 with daily as (
 
     select * from {{ ref('int_listing_daily') }}
@@ -16,6 +11,9 @@ select
     calendar_id,
     listing_id,
     calendar_date,
+
+    -- Precomputed: every revenue-by-month query needs it, and date_trunc inside
+    -- a group by is easy to get subtly wrong.
     date_trunc('month', calendar_date)::date as month_start_date,
 
     is_available,

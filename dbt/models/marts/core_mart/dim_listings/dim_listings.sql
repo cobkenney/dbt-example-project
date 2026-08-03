@@ -1,11 +1,10 @@
--- One row per listing: descriptive attributes plus amenity flags and
--- lifetime performance measures.
---
--- Built from int_amenities_current rather than stg_listings so the grain
--- covers all 50 listings the calendar references. Listing 276450 is absent
--- from stg_listings, so its descriptive columns are NULL and
--- is_orphan_listing marks it.
+-- One row per listing: descriptive attributes plus amenity flags and lifetime
+-- performance measures.
 with amenities as (
+
+    -- Driving table, not stg_listings — this sets the grain to all 50
+    -- listings the calendar references, including orphan 276450.
+    -- See ../README.md.
 
     select * from {{ ref('int_amenities_current') }}
 
@@ -24,8 +23,8 @@ daily_rollup as (
         count(*) as calendar_days,
         count_if(not is_available) as booked_nights,
         count_if(is_available) as available_nights,
-        -- 3 listings are available every day and never booked, so sum() over
-        -- all-NULL revenue returns NULL. Zero is the honest measure.
+        -- coalesce because 3 listings were never booked, so sum() over all-NULL
+        -- revenue returns NULL. Zero is the honest measure.
         coalesce(sum(revenue), 0) as total_revenue,
         avg(price) as avg_nightly_price,
         min(price) as min_nightly_price,
@@ -68,7 +67,6 @@ final as (
         amenities.has_wifi,
         amenities.has_heating,
         amenities.has_kitchen,
-        amenities.has_pool,
 
         daily_rollup.calendar_days,
         daily_rollup.booked_nights,

@@ -7,41 +7,47 @@ models:
       longest bookable stay clamped to the owner's maximum_nights cap.
       Materialized as a table like every other intermediate model — see
       dbt_project.yml.
+    config:
+      tags: ['1x_day']
     columns:
       - name: availability_window_id
-        description: Surrogate key over (listing_id, island_group).
+        description: "{{ doc('availability_window_id') }}"
         data_tests:
           - unique
           - not_null
+
       - name: listing_id
-        description: Listing the window belongs to.
+        description: "{{ doc('listing_id') }}"
         data_tests:
           - not_null
+
       - name: window_start_date
-        description: First available date in the window.
+        description: "{{ doc('window_start_date') }}"
         data_tests:
           - not_null
+
       - name: window_end_date
-        description: Last available date in the window.
+        description: "{{ doc('window_end_date') }}"
         data_tests:
           - not_null
+
       - name: window_length_nights
-        description: >
-          Count of available dates in the window — a count of rows, not
-          datediff(window_start_date, window_end_date), which would be one
-          lower. Every available calendar date is treated as a bookable night.
+        description: "{{ doc('window_length_nights') }}"
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 1
                 inclusive: true
+
+      - name: minimum_nights
+        description: "{{ doc('minimum_nights') }}"
+
+      - name: maximum_nights
+        description: "{{ doc('maximum_nights') }}"
+
       - name: longest_possible_stay_nights
-        description: >
-          least(window_length_nights, maximum_nights). Both constraints bind in
-          real data: for listing 1303261 the window binds (159-night window
-          under a 180-night cap), while for listing 743211 the owner's cap binds
-          (206-night window capped to 90). The cap binds in 8 of 204 windows.
+        description: "{{ doc('longest_possible_stay_nights') }}"
         data_tests:
           - not_null
     data_tests:

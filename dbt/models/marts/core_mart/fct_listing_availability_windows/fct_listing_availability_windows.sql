@@ -1,9 +1,8 @@
--- One row per contiguous availability window per listing, carrying the
--- amenity flags needed to filter windows by what the listing offers.
+-- One row per contiguous availability window per listing, carrying the amenity
+-- flags needed to filter windows by what the listing offers.
 --
--- longest_possible_stay_nights is already clamped upstream to
--- least(window_length_nights, maximum_nights). Both constraints bind in real
--- data, so neither column alone answers "how long could someone actually stay".
+-- longest_possible_stay_nights arrives already clamped from the intermediate
+-- model — do not recompute it from window_length_nights here.
 with windows as (
 
     select * from {{ ref('int_listing_availability_windows') }}

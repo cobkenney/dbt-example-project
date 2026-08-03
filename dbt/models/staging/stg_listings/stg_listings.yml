@@ -6,39 +6,120 @@ models:
       One row per rental listing, lightly cleaned: prices cast to numeric,
       review dates cast to date, bathrooms parsed out of free text.
       Rows with a NULL id are dropped here.
+    config:
+      # Refresh cadence, not a layer label — `dbt build --select tag:1x_day`
+      # selects the daily batch. Declared per model rather than inherited from
+      # dbt_project.yml so a model that moves to a different cadence changes
+      # only its own tag.
+      tags: ['1x_day']
     columns:
       - name: listing_id
-        description: Primary key. Unique and non-null after filtering the 2 NULL-id source rows.
+        description: >
+          {{ doc('listing_id') }}
+
+          Primary key here. Unique and non-null after filtering the 2 NULL-id
+          source rows. Note this table is missing listing 276450, which the
+          calendar and changelog both reference.
         data_tests:
           - unique
           - not_null
+
+      - name: listing_name
+        description: Host-authored title of the listing.
+
       - name: host_id
         description: Identifier of the host who owns this listing.
         data_tests:
           - not_null
+
+      - name: host_name
+        description: Display name of the host. Not unique — one host may hold several listings.
+
+      - name: host_since
+        description: Date the host joined the platform.
+
+      - name: host_location
+        description: Self-reported host location, free text and not normalized.
+
+      - name: host_verifications
+        description: >
+          Raw array string of the verification methods the host has completed,
+          e.g. `['email', 'phone']`. Unparsed — no downstream model reads it.
+
+      - name: neighborhood
+        description: Neighborhood the listing sits in.
+
+      - name: property_type
+        description: Kind of property, e.g. "Entire rental unit" or "Private room in home".
+
       - name: room_type
+        description: 'What the guest books. Two values in this data: "Entire home/apt" and "Private room".'
         data_tests:
           - accepted_values:
               arguments:
                 values: ["Entire home/apt", "Private room"]
+
+      - name: accommodates
+        description: Maximum guests the listing sleeps.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+
+      - name: bathrooms_text
+        description: >
+          Raw bathroom description as free text, e.g. "2.5 baths" or
+          "1 shared bath". Kept alongside the parsed `bathrooms` and
+          `is_shared_bathroom` columns so the original label is not lost.
+
+      - name: bathrooms
+        description: >
+          Numeric bathroom count parsed from bathrooms_text, ranging 1.0-2.5.
+          The raw table also holds a "60 baths" outlier, but it sits on one of
+          the NULL-id rows this model filters out.
+
+      - name: is_shared_bathroom
+        description: >
+          True when bathrooms_text mentions "shared". A shared bathroom is not
+          reflected in the numeric count, so this is the only signal for it.
+
+      - name: bedrooms
+        description: Number of bedrooms. NULL where the host left it unset.
+
+      - name: beds
+        description: Number of beds, which may exceed `bedrooms` for multi-bed rooms.
+
+      - name: amenities
+        description: "{{ doc('amenities_json') }}"
+
       - name: price
-        description: Nightly price in dollars, cast from the raw "$125.00" string.
+        description: >
+          Host's advertised nightly rate in dollars, cast from the raw "$125.00"
+          string.
+
+          This is the list price on the listing record, not what any given date
+          costs — the calendar carries per-date pricing. Surfaced as
+          `list_price` in dim_listings to keep the two apart.
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 inclusive: false
-      - name: bathrooms
+
+      - name: number_of_reviews
+        description: Lifetime review count. Zero for listings that have never been reviewed.
+
+      - name: first_review_date
         description: >
-          Numeric bathroom count parsed from bathrooms_text, ranging 1.0-2.5.
-          The raw table also holds a "60 baths" outlier, but it sits on one of
-          the NULL-id rows this model filters out.
-      - name: accommodates
-        data_tests:
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 1
-                inclusive: true
+          Date of the earliest review, cast from text. NULL for listings with no
+          reviews.
+
+      - name: last_review_date
+        description: >
+          Date of the most recent review, cast from text. NULL for listings with
+          no reviews.
+
       - name: review_scores_rating
         description: Average review score. Null for listings with no reviews.
