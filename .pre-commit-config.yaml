@@ -16,12 +16,12 @@ repos:
   - repo: local
     hooks:
       - id: sqlfluff-lint
-        name: sqlfluff lint (dbt models)
+        name: sqlfluff lint (dbt models and analyses)
         description: >
           Enforce the dbt SQL style guide — lowercase keywords, identifiers,
-          and functions — on staged model SQL.
+          and functions — on staged model and analysis SQL.
         entry: scripts/sqlfluff-lint-staged.sh
         language: script
-        files: ^dbt/models/.*\.sql$
+        files: ^dbt/(models|analyses)/.*\.sql$
         pass_filenames: true
         require_serial: true

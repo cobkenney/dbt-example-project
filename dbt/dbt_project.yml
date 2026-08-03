@@ -35,3 +35,35 @@ models:
       # Staging models are thin renaming/casting layers — views keep them
       # cheap and always current.
       +materialized: view
+    intermediate:
+      # Tables, with no per-model exceptions — one rule for the whole layer.
+      #
+      # This departs from dbt's recommended `ephemeral` for intermediate
+      # models. Ephemeral inlines the logic as a CTE in every consumer, which
+      # re-runs it per consumer and keeps it out of the warehouse entirely;
+      # int_amenities_current and int_listing_daily each have two consumers, so
+      # tables trade a little storage for building that work once. The tradeoff
+      # is the models are queryable, which is why the marts layer — not this
+      # one — is what analysts are pointed at.
+      +materialized: table
+
+      # dbt-snowflake defaults every table to `transient`, which caps Time
+      # Travel at 1 day and forgoes fail-safe. Permanent tables make
+      # data_retention_time_in_days settable — Snowflake rejects it outright on
+      # a transient table. Costs fail-safe storage (7 days, billable, not
+      # configurable) in exchange for being able to inspect prior state.
+      +transient: false
+    marts:
+      # Tables analysts query, built with a custom materialization that emits
+      # `insert overwrite into ... select` instead of `create or replace`.
+      #
+      # `create or replace` creates a new object each run, and Time Travel is
+      # scoped to an object — so the pre-build state of a mart is unreachable.
+      # Overwriting rows in place keeps the object, so analysts can ask what a
+      # mart looked like before it last updated. See
+      # macros/table_insert_overwrite.sql.
+      #
+      # Left transient (the dbt-snowflake default), so Time Travel here is
+      # capped at 1 day. That covers "before the last build" for a daily
+      # schedule but nothing older; set +transient: false to raise it.
+      +materialized: table_insert_overwrite

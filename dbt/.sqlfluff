@@ -46,8 +46,15 @@ aliasing = explicit
 [sqlfluff:rules:references.quoting]
 prefer_quoted_identifiers = false
 
+# Prefer Snowflake's `group by all` over listing columns or positions — it
+# stays correct when the select list changes.
+#
+# `consistent` rather than `implicit` because AM06 has no notion of `group by
+# all`: it classifies `all` as implicit and any `order by <column_name>` as
+# explicit, so the two together trip the rule. `consistent` accepts that pair
+# while still catching a genuine mix like `group by 1, 2` with `order by name`.
 [sqlfluff:rules:ambiguous.column_references]
-group_by_and_order_by_style = implicit
+group_by_and_order_by_style = consistent
 
 [sqlfluff:rules:convention.count_rows]
 prefer_count_1 = false

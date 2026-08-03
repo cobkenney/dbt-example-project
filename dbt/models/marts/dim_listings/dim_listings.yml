@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: dim_listings
+    description: >
+      One row per listing with descriptive attributes, amenity flags, and
+      lifetime performance measures. Grain covers all 50 listings the calendar
+      references, including the one missing from the raw listings table.
+    columns:
+      - name: listing_id
+        description: Primary key.
+        data_tests:
+          - unique
+          - not_null
+      - name: neighborhood
+        description: Listing neighborhood. NULL for the orphan listing.
+      - name: list_price
+        description: Advertised nightly price from the listings table.
+      - name: has_air_conditioning
+        description: Whether the listing offers air conditioning.
+        data_tests:
+          - not_null
+      - name: has_lockbox
+        description: Whether the listing offers a lockbox.
+        data_tests:
+          - not_null
+      - name: has_first_aid_kit
+        description: Whether the listing offers a first aid kit.
+        data_tests:
+          - not_null
+      - name: booked_nights
+        description: Nights booked across the calendar window.
+        data_tests:
+          - not_null
+      - name: total_revenue
+        description: Sum of nightly price across booked nights.
+        data_tests:
+          - not_null
+      - name: occupancy_rate
+        description: booked_nights / calendar_days, using div0 to avoid divide-by-zero.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+                inclusive: true
+      - name: is_orphan_listing
+        description: >
+          True for listing 276450, which appears in the calendar and changelog
+          but not in the raw listings table.
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              booked_nights + available_nights = calendar_days

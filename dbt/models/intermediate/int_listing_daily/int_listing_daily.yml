@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: int_listing_daily
+    description: >
+      One row per listing per date, joining calendar to listing attributes and
+      amenity flags. The daily grain every mart aggregates from. Left joins
+      preserve the 365 orphan rows for listing 276450, which carry $2,200 of
+      booked revenue that an inner join would silently drop.
+    columns:
+      - name: calendar_id
+        description: Surrogate key inherited from stg_calendar.
+        data_tests:
+          - unique
+          - not_null
+      - name: listing_id
+        description: Listing the date belongs to.
+        data_tests:
+          - not_null
+      - name: calendar_date
+        description: Date the row describes. Spans 2021-07-12 to 2022-07-11.
+        data_tests:
+          - not_null
+      - name: is_available
+        description: True when the listing is bookable on this date.
+        data_tests:
+          - not_null
+      - name: price
+        description: Nightly price in dollars.
+        data_tests:
+          - not_null
+      - name: revenue
+        description: >
+          price on booked nights, NULL on available nights. Sums to total
+          revenue without further filtering.
+      - name: is_orphan_listing
+        description: >
+          True for the 365 rows whose listing_id is missing from stg_listings.
+          Marts should include or exclude these explicitly — excluding them
+          shifts the July 2022 no-AC revenue share from 21.2% to 22.1%.
+        data_tests:
+          - not_null
+      - name: neighborhood
+        description: Listing neighborhood. NULL for orphan rows.
+      - name: has_air_conditioning
+        description: Whether the listing lists air conditioning.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [listing_id, calendar_date]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              (is_available and revenue is null)
+              or (not is_available and revenue is not null)
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_calendar')

@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: int_amenities_current
+    description: >
+      One row per listing holding its CURRENT amenity set — the changelog's
+      latest event per listing, flattened from a JSON array and pivoted into
+      boolean flags. This is a deliberate grain reduction, not a history model.
+      The changelog does hold real history (2 events per listing, 48 of 50 with
+      differing amenity sets), but every event predates the calendar window, so
+      a point-in-time join provably changes nothing — see
+      tests/assert_amenities_predate_calendar.sql, which fails if that stops
+      being true. Built from the changelog rather than stg_listings so that
+      listing 276450 — present in the calendar but absent from listings — still
+      gets amenity flags.
+    columns:
+      - name: listing_id
+        description: Primary key. Covers all 50 listings referenced by the calendar.
+        data_tests:
+          - unique
+          - not_null
+      - name: amenity_count
+        description: Number of distinct amenities on the listing.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: amenity_list
+        description: Array of all amenity names, kept for ad-hoc inspection.
+      - name: has_air_conditioning
+        description: >
+          Exact match on the "Air conditioning" amenity. Matched exactly rather
+          than by substring, since '%air%' would also match "Hair dryer".
+        data_tests:
+          - not_null
+      - name: has_lockbox
+        description: Exact match on the "Lockbox" amenity.
+        data_tests:
+          - not_null
+      - name: has_first_aid_kit
+        description: Exact match on the "First aid kit" amenity.
+        data_tests:
+          - not_null
