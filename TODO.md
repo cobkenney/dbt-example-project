@@ -14,7 +14,7 @@
 - [ ] 12. skill that updates descriptions in semantic views if updated in marts tables, runs on commit
 - [x] 13. build verified queries in semantic views — `AI_VERIFIED_QUERIES`, plan settled and the syntax probed against Snowflake; nothing written yet
 - [ ] 14. verify query / view outputs — a `run-operation` that executes every verified query and fails on error, since Snowflake accepts one referencing a table that does not exist (probed: `select no_such_column from no_such_table` created fine). Pin each result to the figure in `analyses/` where one exists, so a query that still runs but has quietly drifted is caught too.
-- [ ] 15. skill for detecting duplicate metrics or dimensions
+- [x] 15. skill for detecting duplicate metrics or dimensions - SKIPPED
 
 
 
@@ -37,7 +37,8 @@
     - Skills to add new possible columns
     - when I used AI vs not
 - [ ] 17. next steps
-  - figure out how to best maximize the context layer / make it available in tools like Claude or Snowflake directly (some agent)
+  - figure out how to best maximize the context layer / make it available in tools like Claude or Snowflake directly (some agent) - real testing
   - combine / collapse some amenities
   - monitor noise of skills
   - set up monitoring on tables (tools like Monte Carlo), might be built in, might need to distinguish between layers what is necessary
+  - similarity assessment of metrics
