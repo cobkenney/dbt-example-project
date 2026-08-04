@@ -13,12 +13,12 @@
 - [x] 11. make amenities closer to host verifications, account for history even though it doesn't exist
 - [x] 12. skill that updates descriptions in semantic views if updated in marts tables, runs on commit
 - [x] 13. build verified queries in semantic views — `AI_VERIFIED_QUERIES`, plan settled and the syntax probed against Snowflake; nothing written yet
-- [ ] 14. verify query / view outputs — a `run-operation` that executes every verified query and fails on error, since Snowflake accepts one referencing a table that does not exist (probed: `select no_such_column from no_such_table` created fine). Pin each result to the figure in `analyses/` where one exists, so a query that still runs but has quietly drifted is caught too.
+- [x] 14. verify query / view outputs
 - [ ] 15. test skills / demonstrate example PR
 - [x] 16. clean up tests (too many on models, some on sources for no reason, bespoke tests)
 - [x] 17. clean up business questions
 - [x] 18. clean up seeds
-- [ ] 19. review macros
+- [x] 19. review macros
 
 
 
