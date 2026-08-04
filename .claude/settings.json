@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dbt parse *)",
+      "Bash(../.venv/bin/dbt parse *)",
+      "Bash(../.venv/bin/python -c ' *)",
+      "WebFetch(domain:docs.snowflake.com)",
+      "Bash(python3 -)",
+      "Bash(../.venv/bin/sqlfluff lint *)",
+      "WebFetch(domain:hub.getdbt.com)",
+      "Bash(../.venv/bin/dbt deps *)",
+      "Bash(dbt compile *)",
+      "Bash(sqlfluff lint *)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

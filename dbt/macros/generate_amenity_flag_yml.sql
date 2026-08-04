@@ -1,10 +1,10 @@
 {#
-    Codegen for the generated amenity flag columns on int_amenities_current.
+    Codegen for the generated amenity flag columns on int_listing_daily.
 
         dbt run-operation generate_amenity_flag_yml
 
     Prints a yml block for every amenity flag not already declared in
-    int_amenities_current.yml, ready to paste into its `columns:` block. Also
+    int_listing_daily.yml, ready to paste into its `columns:` block. Also
     reports flags declared in the yml that no longer exist in the data — which
     is how the stale has_pool entry would have been caught.
 
@@ -27,7 +27,7 @@
     {#- Flags already documented in the model's yml. -#}
     {%- set declared = [] -%}
     {%- for node in graph.nodes.values() -%}
-        {%- if node.name == 'int_amenities_current' -%}
+        {%- if node.name == 'int_listing_daily' -%}
             {%- for column_name in node.columns.keys() -%}
                 {%- do declared.append(column_name | lower) -%}
             {%- endfor -%}
@@ -79,7 +79,7 @@
     {%- do print('') -%}
     {%- do print(
         '--- paste into the columns: block of '
-        ~ 'int_amenities_current.yml ---'
+        ~ 'int_listing_daily.yml ---'
     ) -%}
     {%- do print('') -%}
 

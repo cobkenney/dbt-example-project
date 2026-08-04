@@ -1,0 +1,208 @@
+version: 2
+
+models:
+  - name: dim_hosts
+    description: >
+      One row per host: portfolio size, tenure, and performance. The second
+      dimension in the star schema — both facts carry host_id, so revenue and
+      reservations can be sliced by host segment.
+
+      host_name is PII and is not present in plaintext anywhere in this project.
+      Join on host_id.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: host_id
+        description: >
+          {{ doc('host_id') }}
+
+          Primary key here. 36 hosts.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: host_name_masked
+        description: "{{ doc('host_name_masked') }}"
+
+      - name: host_since
+        description: "{{ doc('host_since') }}"
+
+      - name: as_of_date
+        description: >
+          {{ doc('as_of_date') }}
+
+          Here it is the reference point for host_tenure_years.
+
+          No not_null: this can only be NULL if int_listing_daily is empty, and
+          host_tenure_years' not_null below already catches that, since datediff
+          against a NULL anchor returns NULL.
+
+      - name: host_tenure_years
+        description: >
+          Whole years between host_since and as_of_date. Measured against the
+          snapshot's end rather than current_date, so the value is stable across
+          runs.
+        data_tests:
+          - not_null
+
+      - name: host_location
+        description: "{{ doc('host_location') }}"
+
+      - name: verification_count
+        description: "{{ doc('verification_count') }}"
+        data_tests:
+          - not_null
+
+      - name: verification_list
+        description: "{{ doc('verification_list') }}"
+
+      # Unlike int_hosts, these are named explicitly in dim_hosts.sql rather than
+      # passed through with select *, so this list IS exhaustive — a new method
+      # upstream will not appear here until someone adds it in both places. That
+      # is the intended friction for a mart column.
+      - name: is_verified_email
+        description: "{{ doc('is_verified_email') }}"
+        data_tests:
+          - not_null
+
+      - name: is_verified_phone
+        description: "{{ doc('is_verified_phone') }}"
+        data_tests:
+          - not_null
+
+      - name: is_verified_reviews
+        description: >
+          Whether the host has been verified by platform reviews — 34 of 36
+          hosts. The most discriminating of the common methods.
+        data_tests:
+          - not_null
+
+      - name: is_verified_kba
+        description: >
+          Whether the host completed knowledge-based authentication — 18 of 36
+          hosts.
+        data_tests:
+          - not_null
+
+      - name: is_verified_government_id
+        description: "{{ doc('is_verified_government_id') }}"
+        data_tests:
+          - not_null
+
+      - name: is_verified_offline_government_id
+        description: "{{ doc('is_verified_offline_government_id') }}"
+        data_tests:
+          - not_null
+
+      - name: is_verified_jumio
+        description: >
+          Whether the host was verified through Jumio, a third-party ID
+          vendor — 10 of 36 hosts.
+        data_tests:
+          - not_null
+
+      - name: is_verified_facebook
+        description: >
+          Whether the host linked a Facebook account — 10 of 36 hosts. A social
+          signal, not an identity check.
+        data_tests:
+          - not_null
+
+      - name: is_verified_selfie
+        description: Whether the host submitted a selfie match — 5 of 36 hosts.
+        data_tests:
+          - not_null
+
+      - name: is_verified_identity_manual
+        description: >
+          Whether the host was verified by manual review — 4 of 36 hosts.
+        data_tests:
+          - not_null
+
+      - name: is_verified_work_email
+        description: >
+          Whether the host verified a work email address — 4 of 36 hosts.
+          Distinct from is_verified_email, which every host has.
+        data_tests:
+          - not_null
+
+      - name: listing_count
+        description: "{{ doc('listing_count') }}"
+        data_tests:
+          - not_null
+
+      # No not_null: `listing_count > 1` is a comparison over a count, always
+      # true or false.
+      - name: is_multi_listing_host
+        description: >
+          True where the host holds more than one listing — 7 of 36 hosts. The
+          segmentation for professional-operator vs casual-host questions, since
+          the two are different business relationships with different economics.
+
+      - name: calendar_days
+        description: Total calendar days across all the host's listings.
+        data_tests:
+          - not_null
+
+      - name: booked_nights
+        description: Total booked nights across all the host's listings.
+        data_tests:
+          - not_null
+
+      - name: total_revenue
+        description: "{{ doc('host_total_revenue') }}"
+        data_tests:
+          - not_null
+
+      - name: reservations
+        description: Total reservations across all the host's listings.
+        data_tests:
+          - not_null
+
+      - name: occupancy_rate
+        description: >
+          {{ doc('host_occupancy_rate') }}
+
+          No accepted_range: this is div0(sum(booked_nights),
+          sum(calendar_days)) upstream, where booked_nights counts a subset of
+          the rows calendar_days counts — 0-1 is structural, not an assertion.
+        data_tests:
+          - not_null
+
+      - name: avg_nights_per_stay
+        description: "{{ doc('host_avg_nights_per_stay') }}"
+
+      - name: avg_list_price
+        description: >
+          Average advertised nightly rate across the host's listings. Describes
+          pricing, not achieved revenue.
+
+      - name: revenue_per_listing
+        description: >
+          total_revenue / listing_count — the measure that makes hosts comparable
+          across portfolio sizes.
+
+          Compare hosts on this rather than total_revenue, which a 5-listing host
+          wins by construction.
+
+          No not_null: div0 returns 0 rather than NULL when the denominator is 0,
+          and both inputs are non-NULL aggregates from int_hosts.
+
+      - name: total_reviews
+        description: Lifetime review count summed across the host's listings.
+
+      - name: avg_review_score
+        description: >
+          Unweighted average of the host's listing review scores. NULL only when
+          none of the host's listings have been reviewed.
+
+    # No model-level tests.
+    #
+    # equal_rowcount against int_hosts is gone along with the calendar_window
+    # cross join it existed to guard — as_of_date now comes from a session
+    # variable, so there is no join left that could change the row count. host_id's
+    # `unique` is what holds the grain.
+    #
+    # No booked_nights <= calendar_days test either. Both are sums passed through
+    # from int_hosts, where booked_nights is a count of a subset of the rows
+    # calendar_days counts — the inequality cannot be violated.

@@ -23,10 +23,27 @@ select
     minimum_nights,
     maximum_nights,
 
+    -- Availability-run identity, for questions 3 and 26. Carried so those
+    -- queries group on a column instead of writing a gap-and-island window
+    -- function, which a semantic view cannot express at all.
+    --
+    -- BOTH ARE ONLY MEANINGFUL UNDER `where is_available`. On a booked night
+    -- the sequence holds the number of the window that ended before it. Filter
+    -- first, then group — see the column docs.
+    is_window_start,
+    availability_window_seq,
+
     neighborhood,
     property_type,
     room_type,
     accommodates,
+
+    -- Carried at the daily grain so price-per-bedroom and price-per-bed can be
+    -- computed against the date's actual nightly price, not the listing's
+    -- advertised rate.
+    bedrooms,
+    beds,
+
     host_id,
 
     has_air_conditioning,

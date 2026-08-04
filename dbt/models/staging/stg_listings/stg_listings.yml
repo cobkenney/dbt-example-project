@@ -32,19 +32,17 @@ models:
         data_tests:
           - not_null
 
-      - name: host_name
-        description: Display name of the host. Not unique — one host may hold several listings.
+      - name: host_name_masked
+        description: "{{ doc('host_name_masked') }}"
 
       - name: host_since
-        description: Date the host joined the platform.
+        description: "{{ doc('host_since') }}"
 
       - name: host_location
-        description: Self-reported host location, free text and not normalized.
+        description: "{{ doc('host_location') }}"
 
       - name: host_verifications
-        description: >
-          Raw array string of the verification methods the host has completed,
-          e.g. `['email', 'phone']`. Unparsed — no downstream model reads it.
+        description: "{{ doc('host_verifications') }}"
 
       - name: neighborhood
         description: Neighborhood the listing sits in.
@@ -85,10 +83,10 @@ models:
           reflected in the numeric count, so this is the only signal for it.
 
       - name: bedrooms
-        description: Number of bedrooms. NULL where the host left it unset.
+        description: "{{ doc('bedrooms') }}"
 
       - name: beds
-        description: Number of beds, which may exceed `bedrooms` for multi-bed rooms.
+        description: "{{ doc('beds') }}"
 
       - name: amenities
         description: "{{ doc('amenities_json') }}"

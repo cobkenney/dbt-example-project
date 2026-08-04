@@ -23,6 +23,24 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "dbt_packages"
 
 
+# Reference data, not source data. The one seed here is the list of amenity
+# names the source is known to produce, which int_listing_amenities tests
+# against — see seeds/_seeds.yml. It lands in the intermediate schema rather
+# than a schema of its own, because it is a fixture for a test on an
+# intermediate model and nothing outside that layer reads it.
+#
+# quote_columns is set because dbt-snowflake warns when it is unset, and
+# unquoted is what every other model here uses.
+seeds:
+  rentals:
+    +schema: analytics_int
+    +quote_columns: false
+    +transient: false
+    +meta:
+      layer: intermediate
+      owner: analytics-eng
+      audience: internal
+
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 
@@ -60,7 +78,7 @@ models:
       # This departs from dbt's recommended `ephemeral` for intermediate
       # models. Ephemeral inlines the logic as a CTE in every consumer, which
       # re-runs it per consumer and keeps it out of the warehouse entirely;
-      # int_amenities_current and int_listing_daily each have two consumers, so
+      # int_listing_amenities and int_listing_daily each have two consumers, so
       # tables trade a little storage for building that work once. Being
       # queryable is also what lets this layer carry its own tests, which
       # ephemeral models cannot. Analysts are still pointed at core_mart —
@@ -121,3 +139,35 @@ models:
         # (finance_mart/ -> finance_mart). Each mart declares only its own
         # +schema and inherits the settings above.
         +schema: core_mart
+
+      core_context_layer:
+        # Snowflake semantic views over core_mart — the layer Cortex Analyst and
+        # other natural-language clients read. Not a mart in the usual sense: it
+        # stores no rows and adds no transformation. It names the tables, their
+        # join paths, and the metrics, so a question asked in English resolves to
+        # one agreed-on definition rather than whatever the asker wrote.
+        #
+        # Sits under marts/ rather than beside it because it is granted like a
+        # mart and depends only on core_mart.
+        +schema: core_context_layer
+
+        # Every setting inherited from marts/ above is wrong here, because a
+        # semantic view is not a table:
+        #
+        #   materialized — the semantic_view materialization from
+        #     Snowflake-Labs/dbt_semantic_view. The model body is the CREATE
+        #     SEMANTIC VIEW DDL from TABLES(...) onward, not a select.
+        #   transient — a table-only property. Snowflake rejects it here.
+        #   persist_docs — explicitly unsupported by the package, and there are
+        #     no rows or columns to comment on. The COMMENT clauses inside each
+        #     view's DDL are what Snowflake actually stores, and Cortex Analyst
+        #     reads those to pick a metric.
+        +materialized: semantic_view
+        +transient: null
+        +persist_docs:
+          relation: false
+          columns: false
+        +meta:
+          layer: context
+          owner: analytics-eng
+          audience: analysts

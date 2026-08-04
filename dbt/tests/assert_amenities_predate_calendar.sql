@@ -1,4 +1,4 @@
--- Guards the grain reduction in int_amenities_current.
+-- Guards the grain reduction in int_listing_amenities.
 --
 -- That model keeps only each listing's latest amenity snapshot. Collapsing
 -- history that way is only correct while every changelog event predates the
@@ -8,8 +8,10 @@
 --
 -- Today the newest event is 2021-07-06 and the calendar opens 2021-07-12, so
 -- this returns no rows. If a newer amenity event is ever loaded, this fails and
--- int_amenities_current must become an SCD2 model (valid_from/valid_to via
--- lead() — each changelog row already carries a full snapshot, not a delta).
+-- int_listing_amenities must become an SCD2 model (valid_from/valid_to via
+-- lead() — each changelog row already carries a full snapshot, not a delta),
+-- and the boolean pivot in int_listing_daily has to join on a date range rather
+-- than on listing_id alone.
 with calendar_window as (
 
     select min(calendar_date) as window_opens_at

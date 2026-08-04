@@ -22,6 +22,18 @@ sources:
                     severity: warn
           - name: host_id
             description: Identifier of the host who owns this listing.
+          - name: host_name
+            description: >
+              Host's real name. **PII — do not select this column into any
+              model.** stg_listings is the only model permitted to read it, and
+              it emits host_name_masked instead, so no dbt layer holds the
+              plaintext. See macros/mask_pii.sql.
+
+              The plaintext remains here in RAW_DATA; restricting that requires
+              a Snowflake masking policy, which dbt cannot express.
+            config:
+              meta:
+                contains_pii: true
           - name: room_type
             description: Either "Entire home/apt" or "Private room".
             data_tests:

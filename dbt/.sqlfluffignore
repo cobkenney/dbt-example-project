@@ -2,3 +2,13 @@ dbt_packages/
 macros/
 target/
 logs/
+
+# Semantic views are CREATE SEMANTIC VIEW DDL, not select statements — the model
+# body starts at TABLES(...). sqlfluff's snowflake dialect cannot parse that
+# grammar, so every model here fails with "unparsable section" no matter how it
+# is formatted. Nothing to fix by reformatting, so the folder is excluded rather
+# than carrying a noqa on every file.
+#
+# Snowflake itself is the parser that matters here: `dbt run` fails outright on a
+# malformed clause, which is a stricter check than the linter was giving.
+models/marts/core_context_layer/

@@ -10,7 +10,14 @@ renamed as (
         id as listing_id,
         name as listing_name,
         host_id,
-        host_name,
+
+        -- PII: the host's real name never enters the dbt layers in plaintext.
+        -- Masked here at the staging boundary rather than in the mart, so no
+        -- model downstream of this one can expose it even by accident.
+        -- host_id already identifies a host for every join and grouping this
+        -- project needs, so nothing is lost.
+        {{ mask_pii('host_name') }} as host_name_masked,
+
         host_since,
         host_location,
         host_verifications,

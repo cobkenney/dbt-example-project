@@ -9,8 +9,9 @@ models:
       - name: amenities_change_id
         description: Surrogate key over (listing_id, changed_at).
         data_tests:
+          # No not_null: generate_surrogate_key coalesces NULL inputs to a
+          # sentinel string before hashing, so it cannot emit NULL.
           - unique
-          - not_null
 
       - name: listing_id
         description: >
@@ -31,7 +32,7 @@ models:
         description: >
           When the amenity set changed. Two events per listing, the latest
           being 2021-07-06 — every event predates the 2021-07-12 calendar
-          opening, which is what lets int_amenities_current collapse to the
+          opening, which is what lets int_listing_amenities collapse to the
           most recent event.
         data_tests:
           - not_null

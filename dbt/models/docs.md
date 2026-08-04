@@ -34,12 +34,6 @@ Surrogate key over (listing_id, calendar_date), generated in stg_calendar and
 carried through unchanged. Unique at the daily grain.
 {% enddocs %}
 
-{% docs availability_window_id %}
-Surrogate key over (listing_id, island_group), where island_group is the
-gap-and-island constant that groups consecutive available dates. Unique per
-availability window.
-{% enddocs %}
-
 {% docs reservation_id %}
 Identifier of the booking occupying this date, NULL when the date is available.
 
@@ -50,6 +44,162 @@ stg_calendar converts those to true NULLs.
 {% docs host_id %}
 Identifier of the host who owns the listing. NULL where the listing is absent
 from the raw listings table.
+{% enddocs %}
+
+{% docs host_name_masked %}
+Salted SHA-256 of the host's name, truncated to 16 hex characters. **The
+plaintext name is PII and does not exist anywhere in the dbt layers** — it is
+masked in stg_listings, the first model to touch the source.
+
+Usable as a grouping key (rows sharing a hash share a name) but not reversible:
+the salt is what prevents recovering a first name by hashing a name list. Use
+host_id for joins — it identifies a host directly and is stable across salt
+rotations, which change every hash here.
+
+Note that host names are not unique in this data: 36 hosts hold 35 distinct
+names, so two different hosts share a name and therefore share a hash. Never
+treat this as a host identifier.
+
+See macros/mask_pii.sql. The plaintext still exists in RAW_DATA, which dbt
+cannot reach — that needs a Snowflake masking policy.
+{% enddocs %}
+
+
+{#-- Hosts ------------------------------------------------------------------#}
+
+{% docs host_since %}
+Date the host joined the platform.
+
+Clusters in 2008–2009 for 49 of 50 listings, matching the first amenity-changelog
+event — these are long-tenured hosts, so tenure has little variance to explain
+performance with on this data.
+{% enddocs %}
+
+{% docs host_location %}
+Self-reported host location, free text and not normalized.
+
+Not comparable to `neighborhood`, which describes where the listing is — a host
+can live anywhere relative to the property they rent out.
+{% enddocs %}
+
+{% docs host_verifications %}
+Raw JSON array string of the verification methods the host has completed, e.g.
+`'["email", "phone", "reviews", "kba"]'`.
+
+Kept only in staging. Downstream, use int_host_verifications (host × method) or
+the generated `is_verified_*` flags on int_hosts — do not string-match this
+column. `contains(host_verifications, 'government_id')` also matches
+`offline_government_id`, and `'email'` also matches `'work_email'`.
+
+Both of those return the correct answer on today's data only by luck: each
+narrower method happens to be a strict subset of the broader one (10 of the 16
+government_id hosts also have offline, 4 of 36 email hosts also have work_email).
+Nothing enforces that, so the substring shortcut is a latent bug rather than a
+live one — which is a worse thing to leave in a query, because it will pass
+review.
+{% enddocs %}
+
+{% docs verification_method %}
+One verification method a host has completed, unflattened from the raw array.
+
+11 distinct methods across 36 hosts: email 36, phone 36, reviews 34, kba 18,
+government_id 16, jumio 10, facebook 10, offline_government_id 10, selfie 5,
+identity_manual 4, work_email 4.
+
+Note that `government_id` and `offline_government_id` are separate values, as are
+`email` and `work_email` — so substring matching on the raw array conflates each
+pair. It gives the right answer on this snapshot only because the narrower method
+is a strict subset of the broader one in both cases; nothing guarantees that.
+{% enddocs %}
+
+{% docs verification_count %}
+Number of distinct verification methods the host has completed.
+
+Ranges 2–9 across the 36 hosts, clustering at 4–6 (24 of 36). Every host has at
+least email and phone, so 2 is the floor on this data rather than a designed
+minimum — if that ever changes, `is_verified_email` is what makes it visible.
+
+NULL, not 0, for a host with no rows in int_host_verifications — an empty or
+unparseable array. There are none today, and the left join keeps that
+distinguishable from a host verified by nothing.
+{% enddocs %}
+
+{% docs verification_list %}
+Array of the host's verification methods.
+
+Redundant with the generated `is_verified_*` flags for filtering. Kept because it
+survives the source adding a new method without a schema change, and because it
+reads better than 11 booleans when you just want to see what a host has.
+{% enddocs %}
+
+{% docs is_verified_email %}
+Whether the host has a verified email address. Generated flag.
+
+True for all 36 hosts, so it has no analytical use — it is kept as a tripwire.
+A universally-true flag is the only thing that makes its own violation visible:
+the day a host lands without a verified email this goes false and is queryable,
+which is impossible if the column was dropped for carrying no signal.
+
+Filter on this expecting variance and you will get every host back.
+{% enddocs %}
+
+{% docs is_verified_phone %}
+Whether the host has a verified phone number. Generated flag.
+
+True for all 36 hosts. Kept as a tripwire for the same reason as
+is_verified_email — see that column's description.
+{% enddocs %}
+
+{% docs is_verified_government_id %}
+Whether the host completed government ID verification — 16 of 36 hosts.
+Generated flag.
+
+Distinct from is_verified_offline_government_id, a separate method. On this data
+all 10 offline hosts also have this flag, so the two are nested rather than
+disjoint — do not add them together expecting 26 hosts. The source treats them as
+different processes, so that nesting is a property of the snapshot, not a rule.
+{% enddocs %}
+
+{% docs is_verified_offline_government_id %}
+Whether the host completed government ID verification through the offline
+channel — 10 of 36 hosts. Generated flag.
+
+All 10 also carry is_verified_government_id, so this is a subset of that flag on
+this data. Exists separately because the source treats it as its own method, and
+because substring-matching `government_id` on the raw array cannot tell them
+apart — a shortcut that works only while the nesting holds.
+{% enddocs %}
+
+{% docs listing_count %}
+Number of listings the host holds.
+
+29 of 36 hosts hold exactly one; the largest holds 5. Compare hosts on
+revenue_per_listing rather than total_revenue, which scales with this by
+construction.
+{% enddocs %}
+
+{% docs host_total_revenue %}
+Total booked revenue across all the host's listings over the calendar year.
+
+Zero, not NULL, for a host whose listings were never booked — the honest measure
+for a host who earned nothing.
+{% enddocs %}
+
+{% docs host_occupancy_rate %}
+Booked nights divided by calendar days, summed across the host's listings before
+dividing.
+
+Portfolio-weighted on purpose: averaging per-listing rates would let a listing
+with 30 calendar days count as much as one with 365.
+{% enddocs %}
+
+{% docs host_avg_nights_per_stay %}
+Average length of stay across the host's reservations, weighted by reservation
+count.
+
+Excludes reservations censored at the snapshot edges, whose lengths are truncated
+— see is_reservation_censored. NULL where every reservation of the host's is
+censored, or where the host has none.
 {% enddocs %}
 
 
@@ -63,6 +213,21 @@ one-year snapshot, not a rolling window.
 {% docs is_available %}
 True when the listing is bookable on this date, false when it is already
 reserved. Revenue accrues only on unavailable (booked) nights.
+{% enddocs %}
+
+{% docs as_of_date %}
+Last date in the calendar snapshot (2022-07-11) — the reference point for every
+age or tenure measure in the marts. Constant across every row.
+
+Carried as a column rather than left implicit so a figure measured against it can
+be reproduced later, and so nobody assumes `current_date` was used. It was not,
+deliberately: the data is a fixed year, so `current_date` would give a different
+answer on every run.
+
+Supplied by the `$calendar_as_of_date` session variable that each model's
+pre-hook sets from int_listing_daily, not by a join — see the model headers. Both
+dim_listings and dim_hosts set the same variable from the same source, so the two
+dimensions anchor to the same date by construction.
 {% enddocs %}
 
 
@@ -93,35 +258,132 @@ Longest stay the host will accept, as set on the listing's calendar. Caps how
 much of an availability window is actually bookable in one stay.
 {% enddocs %}
 
+{% docs is_window_start %}
+True on the first available night of a contiguous run of available nights, false
+everywhere else — including on every booked night.
 
-{#-- Availability windows ---------------------------------------------------#}
+The building block of the availability-window questions (#3, longest possible
+stay; #26, revenue lost to unbookable windows), which need to group consecutive
+available dates into runs. Reading a boolean column is what those queries do
+instead of writing the gap-and-island window function themselves.
 
-{% docs window_start_date %}
-First available date in the contiguous window.
+Computed with `lag(is_available)`, coalesced to false so the first row of each
+listing counts as a start when it is available. `sum()` of this column is the
+number of availability windows a listing has — 204 across the 50 listings.
 {% enddocs %}
 
-{% docs window_end_date %}
-Last available date in the contiguous window.
+{% docs availability_window_seq %}
+Sequence number identifying which availability window a date belongs to, counting
+from 1 within each listing. Constant across every night of one window, so
+`group by listing_id, availability_window_seq` gives one group per contiguous run
+of available nights.
+
+**MEANINGFUL ONLY WHERE `is_available` IS TRUE.** It is a running count of
+windows *started so far*, so a booked night carries the number of the window that
+ended before it — which is why every consumer must filter `is_available` before
+grouping on it. Without that filter each group also collects the booked nights
+that follow its window, and `count(*)` returns a window longer than the run
+actually is.
+
+Two rules this column does NOT encode, both of which produce a plausible wrong
+answer and neither of which lives here — see
+`analyses/03_long_stay_picky_renter.sql`:
+
+1. **Window length is `count(*)`, not `datediff(min, max)`**, which is one lower.
+   Every available date is a bookable night: 2022-02-03 through 2022-07-11 is 159
+   nights, not 158.
+2. **Longest bookable stay is `least(window_length, maximum_nights)`.** Both
+   constraints bind in this data — the window usually, the owner's cap in 8 of
+   204 windows — so neither column alone answers "longest possible stay."
+   `tests/assert_stay_cap_binds.sql` guards that premise.
+
+Depends on the calendar being gap-free per listing, which it is: 50 listings ×
+365 dates, no gaps and no duplicate dates. A missing date would merge the runs on
+either side of it into one window, where the older `date - row_number()` form
+would have split them. The `calendar_id` uniqueness test plus `calendar_date`
+being not-null is what keeps that assumption honest.
 {% enddocs %}
 
-{% docs window_length_nights %}
-Count of available dates in the window.
 
-Counted as rows, not `datediff(window_start_date, window_end_date)`, which
-would be one lower — every available calendar date counts as a bookable night.
-Listing 1303261's 2022-02-03 to 2022-07-11 window is 159 nights, not 158.
+{#-- Reservations -----------------------------------------------------------#}
+
+{% docs reservation_key %}
+Surrogate key over (listing_id, reservation_id). Unique per reservation.
+
+Needed because reservation_id is **not** unique on its own: id 836 covers two
+separate one-night stays, on listings 753446 and 801680, both on 2021-07-12.
+Grouping on reservation_id alone would merge them into one impossible 2-night
+reservation spanning two properties, so join and count on this column.
 {% enddocs %}
 
-{% docs longest_possible_stay_nights %}
-`least(window_length_nights, maximum_nights)` — the longest stay actually
-bookable in this window.
-
-Both constraints bind in real data, so neither column alone answers the
-question: listing 1303261 has a 159-night window under a 180-night cap (window
-binds), while listing 743211 has a 206-night window capped to 90 (cap binds).
-The cap binds in 8 of 204 windows.
+{% docs check_in_date %}
+First night of the reservation — the earliest occupied date carrying this
+reservation_id.
 {% enddocs %}
 
+{% docs last_night_date %}
+Last night the guest sleeps in the unit.
+
+Kept alongside check_out_date because "nights sold" and "the date the unit frees
+up" are different questions — housekeeping cares about the latter.
+{% enddocs %}
+
+{% docs check_out_date %}
+Morning the guest departs — `last_night_date + 1`, following the industry
+convention that a checkout date is not a night sold.
+
+`nights` is therefore `check_out_date - check_in_date`, and summing `nights`
+across reservations reconciles to the count of booked nights in the calendar.
+{% enddocs %}
+
+{% docs nights %}
+Number of nights the reservation occupies, counted as occupied calendar rows.
+
+A floor rather than an exact length where the reservation touches either edge of
+the calendar snapshot — see is_left_censored / is_right_censored.
+{% enddocs %}
+
+{% docs reservation_revenue %}
+Total revenue for the reservation: the sum of nightly prices across its booked
+nights.
+
+Gross of any fee or commission — the raw data carries no cost, cleaning fee, or
+platform take, so this is not margin.
+{% enddocs %}
+
+{% docs is_contiguous %}
+True when the reservation's nights are consecutive, so collapsing them to a
+single check-in/check-out span is honest.
+
+False would mean one reservation_id covers two separate stays, making
+check_out_date overstate the first. Asserted true, so a load that breaks the
+assumption fails the build rather than quietly inflating length of stay.
+{% enddocs %}
+
+{% docs is_reservation_censored %}
+True when the reservation touches an edge of the calendar snapshot
+(2021-07-12 or 2022-07-11), meaning nights outside the loaded year are not
+counted.
+
+`nights` is then a floor on the true stay length, not the stay length. Exclude
+censored reservations before reporting average length of stay, or the average is
+biased downward — long stays are the ones most likely to cross an edge.
+{% enddocs %}
+
+
+{#--
+    Availability windows had five doc blocks here — window_start_date,
+    window_end_date, window_length_nights, longest_possible_stay_nights, and
+    availability_window_id. All five went when the two windows models were
+    collapsed into analyses/03_long_stay_picky_renter.sql; no model declares
+    those columns now, and a doc block with no consumer is a maintenance trap.
+
+    The two facts worth keeping are in that analysis's header, where the person
+    re-deriving windows will actually see them: window length is count(*) and
+    not datediff (off by one), and the longest bookable stay is
+    least(window, maximum_nights) because both constraints bind. See also
+    tests/assert_stay_cap_binds.sql and "Collapsed models" in README.md.
+--#}
 
 {#-- Listing attributes ----------------------------------------------------#}
 
@@ -150,12 +412,38 @@ Maximum guests the listing sleeps. NULL where the listing is absent from the raw
 listings table.
 {% enddocs %}
 
+{% docs bedrooms %}
+Number of bedrooms, ranging 1-4. Never 0, but **NULL on 8 of 49 listings** where
+the host left it unset — and NULL where the listing is absent from the raw
+listings table.
+
+Price-per-bedroom is therefore NULL for those 8 rather than wrong. No div0 needed
+since 0 never occurs, but expect the denominator to be missing for ~16% of
+listings — all 8 are entire homes, so that layer's figures rest on 23 listings
+rather than 31.
+{% enddocs %}
+
+{% docs beds %}
+Number of beds, which may exceed `bedrooms` for multi-bed rooms. Never NULL in
+the current data, but **0 on 4 of 49 listings** — and NULL where the listing is
+absent from the raw listings table.
+
+The opposite failure mode to `bedrooms`: always populated, but dividing by it
+needs div0 or nullif for those 4, otherwise price-per-bed errors out. One listing
+records 1 bedroom and 0 beds, so the two columns disagree rather than one being a
+clean fallback for the other.
+
+Both gaps fall entirely on entire homes; private rooms have complete data for
+both columns.
+{% enddocs %}
+
 
 {#-- Amenities -------------------------------------------------------------#}
 
 {% docs amenities_json %}
 Raw amenity set as a JSON array string, e.g. `["Wifi", "Kitchen"]`. Flattened
-and pivoted into boolean flags by int_amenities_current.
+by int_listing_amenities, then pivoted into boolean flags by
+int_listing_daily.
 {% enddocs %}
 
 {% docs amenity_count %}

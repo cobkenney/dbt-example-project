@@ -1,0 +1,117 @@
+version: 2
+
+seeds:
+  - name: known_amenity_names
+    description: >
+      The 81 amenity names this project generates a flag for — a pinned list, not
+      source data and not a dimension. It does two jobs, and the second is why it
+      exists rather than being an inline list of literals:
+
+
+      1. `int_listing_amenities` relationships-tests `amenity_name` against it at
+      `severity: warn`, so a new amenity upstream announces itself.
+
+
+      2. `int_listing_daily` LOOPS OVER IT to generate its 81 `has_*` flag
+      columns, via `get_amenity_names()`. This file is therefore the model's
+      column list. An amenity appearing or disappearing in the source cannot add
+      or drop a column — only a commit to this file can, which is what makes a
+      schema change reviewable rather than something that happens overnight.
+
+
+      Regenerate rather than hand-edit:
+
+          dbt --quiet run-operation generate_known_amenity_names_seed > seeds/known_amenity_names.csv
+
+      That macro reads `int_listing_amenities` — the one place that still looks at
+      the data — and emits the CSV. Because of job 2, running it is what ADDS THE
+      COLUMN, so the same commit needs the yml entry
+      (`generate_amenity_flag_yml`) and the decision about whether the mart
+      carries the flag. A seed diff on its own means an undocumented column and a
+      silenced warning.
+
+
+      A SEED rather than 81 literal values in the yml, which is where this
+      started. What that bought: the list is regenerable by macro instead of by
+      hand, the diff on a source change is one line instead of a churned test
+      name, and the test and the codegen read the same list instead of two copies
+      of it — an `accepted_values` list in yml cannot be read by a Jinja loop,
+      which is the constraint that settles this.
+
+
+      The cost is real and worth stating: a seed is a build artifact, so
+      `dbt test` on `int_listing_amenities` now depends on `dbt seed` having run,
+      and so does `dbt run` on `int_listing_daily` — which is why that model
+      carries an explicit `-- depends_on:` for this seed. A fresh clone that skips
+      the seed gets a missing-relation error. `dbt build` handles the ordering;
+      `dbt test` or `dbt run` alone do not.
+    config:
+      tags: ['1x_day']
+
+      # A test fixture with 81 rows and no history worth keeping, unlike the
+      # intermediate tables it supports. Transient is the dbt-snowflake default
+      # and the right call here — overriding the +transient: false set for this
+      # path in dbt_project.yml, which exists for models that need Time Travel.
+      transient: true
+    columns:
+      - name: amenity_name
+        description: >
+          The amenity exactly as the source array spells it, unmodified —
+          including the Unicode apostrophes (U+2019) in "Children’s books and
+          toys" and "Pack ’n Play/travel crib". Byte-for-byte match matters: this
+          is the join key for the relationships test, so a straightened
+          apostrophe here would report a false positive.
+        data_tests:
+          - unique
+          - not_null
+
+  - name: known_verification_methods
+    description: >
+      The 11 host verification methods this project generates a flag for. Same two
+      jobs as `known_amenity_names`, same reasoning — see that seed's description.
+
+
+      1. `int_host_verifications` relationships-tests `verification_method`
+      against it at `severity: warn`.
+
+
+      2. `int_hosts` loops over it to generate its 11 `is_verified_*` columns, via
+      `get_verification_methods()`.
+
+
+      Regenerate rather than hand-edit:
+
+          dbt --quiet run-operation generate_known_verification_methods_seed > seeds/known_verification_methods.csv
+
+
+      A SEED at only 11 values, where `int_host_verifications.yml` used to argue
+      that 11 inline was fine. That was true while the list only fed a test. Job 2
+      is what changed it: a Jinja loop cannot read an `accepted_values` list out of
+      yml, so keeping the values inline would mean maintaining the same 11 in two
+      files by hand.
+
+
+      The stakes are higher here than for amenities, which is the other half of the
+      argument. `dim_hosts` names all 11 flags explicitly rather than passing them
+      through, so a method disappearing from the source used to drop a column from
+      `int_hosts` and break the mart at run time. Pinning the list means the flag
+      survives, goes universally false, and stays queryable.
+    config:
+      tags: ['1x_day']
+
+      # Same call as known_amenity_names: a fixture with 11 rows and no history
+      # worth keeping, so transient overrides the +transient: false this path sets
+      # for models that need Time Travel.
+      transient: true
+    columns:
+      - name: verification_method
+        description: >
+          The method exactly as the source JSON array spells it. All 11 are
+          lowercase snake_case identifiers — no apostrophes, commas or quotes, so
+          unlike the amenity names these need no CSV escaping. Case matters:
+          `verification_flag_name()` lowercases, so an upstream `Email` would
+          collide with `email` rather than produce a second flag, and the
+          relationships test is what reports it.
+        data_tests:
+          - unique
+          - not_null

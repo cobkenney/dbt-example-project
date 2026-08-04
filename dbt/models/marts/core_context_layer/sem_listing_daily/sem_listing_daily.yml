@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: sem_listing_daily
+    description: >
+      Snowflake semantic view over `fct_listing_daily`: nightly revenue,
+      pricing, occupancy and availability at listing x date grain.
+
+      Measures belong to the daily fact only. `dim_listings` and `dim_hosts`
+      join in as attribute sources, and their lifetime measures are
+      deliberately absent — see the model header.
+
+      Note that this description does not reach Snowflake. `persist_docs` is
+      unsupported for semantic views, so the `COMMENT` clauses inside the DDL
+      are what Cortex Analyst actually reads. This block is for `dbt docs`.
+    config:
+      tags: ['1x_day']
+
+    # No column-level docs and no data_tests. A semantic view exposes metrics
+    # and dimensions rather than columns, so dbt has no column list to attach
+    # tests to — `dbt test` cannot reach a metric. The grain, uniqueness and
+    # reconciliation tests all live on the underlying marts in core_mart, which
+    # is the right place for them: if fct_listing_daily is sound, this view
+    # cannot invent a wrong number, only expose it under a wrong name.
+    #
+    # What is NOT covered by that argument, and is worth knowing: nothing here
+    # asserts that a metric's SQL means what its COMMENT says. That is what the
+    # verified queries will do once they are added — each one pins a metric to a
+    # figure already verified in analyses/.

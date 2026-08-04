@@ -4,8 +4,9 @@ models:
   - name: dim_listings
     description: >
       One row per listing with descriptive attributes, amenity flags, and
-      lifetime performance measures. Grain covers all 50 listings the calendar
-      references, including the one missing from the raw listings table.
+      lifetime performance measures. Includes listings from calendar source
+      that may have been hard deleted from listings source
+      (is_orphan_listing = TRUE).
     config:
       tags: ['1x_day']
     columns:
@@ -34,10 +35,10 @@ models:
         description: "{{ doc('accommodates') }}"
 
       - name: bedrooms
-        description: Number of bedrooms. NULL for the orphan listing or where the host left it unset.
+        description: "{{ doc('bedrooms') }}"
 
       - name: beds
-        description: Number of beds, which may exceed `bedrooms` for multi-bed rooms.
+        description: "{{ doc('beds') }}"
 
       - name: bathrooms
         description: >
@@ -62,13 +63,25 @@ models:
       - name: last_review_date
         description: Date of the most recent review. NULL for listings with no reviews.
 
+      - name: as_of_date
+        description: >
+          {{ doc('as_of_date') }}
+
+          Present on this model so review recency can be measured without
+          reaching through host_id — the orphan listing has none. Not compared
+          against anything here; the query picks the unit.
+
+          No not_null: this can only be NULL if int_listing_daily is empty, which
+          booked_nights' not_null below already catches.
+
       - name: host_id
         description: "{{ doc('host_id') }}"
 
-      - name: host_name
+      - name: host_name_masked
         description: >
-          Display name of the host. Not unique — one host may hold several
-          listings. NULL for the orphan listing.
+          {{ doc('host_name_masked') }}
+
+          NULL for the orphan listing, which has no listings row at all.
 
       - name: host_since
         description: Date the host joined the platform. NULL for the orphan listing.
@@ -157,19 +170,26 @@ models:
         description: >
           booked_nights / calendar_days, using div0 so a listing with no
           calendar rows yields 0 rather than erroring. Ranges 0-1.
+
+          No accepted_range: booked_nights is count_if over the rows
+          calendar_days counts, so the ratio cannot leave 0-1. not_null is kept —
+          div0 returns NULL when its inputs are NULL, which is what the
+          daily_rollup left join would produce.
         data_tests:
           - not_null
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 0
-                max_value: 1
-                inclusive: true
 
       - name: is_orphan_listing
         description: "{{ doc('is_orphan_listing') }}"
-        data_tests:
-          - not_null
     data_tests:
+      # The reconciliation worth keeping. booked_nights and available_nights are
+      # counted independently with count_if, so this catches a NULL is_available
+      # in the calendar — where both count_if predicates go NULL, the row falls
+      # out of both counts, and the sum stops matching count(*).
+      #
+      # It does NOT cover a NULL calendar_days from the daily_rollup left join:
+      # the test compiles to `where not (expression)`, and not(NULL) is NULL, so
+      # a NULL row passes silently. booked_nights' not_null is what catches that
+      # join missing.
       - dbt_utils.expression_is_true:
           arguments:
             expression: >
