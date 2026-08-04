@@ -1,7 +1,7 @@
 # TODO
 
 - [x] 1. Build semantic views — `marts/core_context_layer/`, four of them: one per grain of additive measure in `core_mart`, which is what stops a fan-out join from silently double-counting. Covers 27 of the 28 business questions (#28 needs a guest key). Materialized with `Snowflake-Labs/dbt_semantic_view`. Five verified figures from `analyses/` reproduced exactly through them; see that folder's README for the reconciliation and for what the syntax cannot express.
-- [ ] 2. Build a skill called wake-up-ae that opens a PR for new amenities or verification methods that trigger from test warning
+- [x] 2. Build a skill called wake-up-ae that opens a PR for new amenities or verification methods that trigger from test warning
 - [x] 3. Determine if a new amenity is common enough (> 5% of listings have it) to be added to the marts layer
 - [x] 4. Check whether any of the amenities columns are similar to each other
 - [x] 5. Figure out if we really need `availability_windows` — is `fct_listing_daily` enough to answer that question easily? **Yes it is.** Both dependent questions (#3 and #26 in `BUSINESS_QUESTIONS.md`) reproduce exactly from the daily fact, so the 2 models / 258 lines / 25 tests were collapsed into `analyses/03`. The clamp rule survives as `tests/assert_stay_cap_binds.sql`; see "Collapsed models" in `dbt/models/README.md`.
@@ -11,10 +11,10 @@
 - [ ] 10. clean up all comments / docs / etc
   - remove all comments that are so specific to rows or values in the tables today, just include those in project summary about decisions made
 - [x] 11. make amenities closer to host verifications, account for history even though it doesn't exist
-- [ ] 12. skill that updates descriptions in semantic views if updated in marts tables, runs on commit
+- [x] 12. skill that updates descriptions in semantic views if updated in marts tables, runs on commit
 - [x] 13. build verified queries in semantic views — `AI_VERIFIED_QUERIES`, plan settled and the syntax probed against Snowflake; nothing written yet
 - [ ] 14. verify query / view outputs — a `run-operation` that executes every verified query and fails on error, since Snowflake accepts one referencing a table that does not exist (probed: `select no_such_column from no_such_table` created fine). Pin each result to the figure in `analyses/` where one exists, so a query that still runs but has quietly drifted is caught too.
-- [x] 15. skill for detecting duplicate metrics or dimensions - SKIPPED
+- [] 15. test skills
 
 
 
