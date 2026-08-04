@@ -23,21 +23,27 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "dbt_packages"
 
 
-# Reference data, not source data. The one seed here is the list of amenity
-# names the source is known to produce, which int_listing_amenities tests
-# against — see seeds/_seeds.yml. It lands in the intermediate schema rather
-# than a schema of its own, because it is a fixture for a test on an
-# intermediate model and nothing outside that layer reads it.
+# Reference data, not source data — the pinned vocabularies the intermediate
+# models loop over to generate their flag columns, and test against. See
+# seeds/_seeds.yml.
+#
+# A schema of their own rather than analytics_stg or analytics_int, because a
+# seed does not satisfy either layer's rule. Staging is views, and a seed can
+# only be a table — it would be that schema's one silent exception, findable
+# only by querying the information schema. Intermediate is the right
+# materialization but the wrong claim: everything there is DERIVED, and these
+# are INPUTS to the graph, committed by hand and reviewed in a diff. Their own
+# schema says what they are and is grantable on its own.
 #
 # quote_columns is set because dbt-snowflake warns when it is unset, and
 # unquoted is what every other model here uses.
 seeds:
   rentals:
-    +schema: analytics_int
+    +schema: analytics_seed
     +quote_columns: false
     +transient: false
     +meta:
-      layer: intermediate
+      layer: seed
       owner: analytics-eng
       audience: internal
 
@@ -47,11 +53,11 @@ seeds:
 # In this example config, we tell dbt to build all models in the example/
 # directory as views. These settings can be overridden in the individual model
 # files using the `{{ config(...) }}` macro.
-# Each layer lands in its own schema (analytics_stg / analytics_int, and one
-# schema per mart) so access can be granted per schema — analysts get core_mart,
-# and the layers behind it stay closed. macros/generate_schema_name.sql turns
-# the `+schema:` values below into bare names in prod and developer-prefixed
-# names everywhere else.
+# Each layer lands in its own schema (analytics_stg / analytics_int, one schema
+# per mart, and analytics_seed above) so access can be granted per schema —
+# analysts get core_mart, and the layers behind it stay closed.
+# macros/generate_schema_name.sql turns the `+schema:` values below into bare
+# names in prod and developer-prefixed names everywhere else.
 models:
   rentals:
     # Push the descriptions in the model .yml files into Snowflake's own

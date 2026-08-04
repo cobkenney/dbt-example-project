@@ -14,13 +14,17 @@
 - [x] 12. skill that updates descriptions in semantic views if updated in marts tables, runs on commit
 - [x] 13. build verified queries in semantic views — `AI_VERIFIED_QUERIES`, plan settled and the syntax probed against Snowflake; nothing written yet
 - [ ] 14. verify query / view outputs — a `run-operation` that executes every verified query and fails on error, since Snowflake accepts one referencing a table that does not exist (probed: `select no_such_column from no_such_table` created fine). Pin each result to the figure in `analyses/` where one exists, so a query that still runs but has quietly drifted is caught too.
-- [] 15. test skills
+- [ ] 15. test skills / demonstrate example PR
+- [ ] 16. clean up tests (too many on models, some on sources for no reason, bespoke tests)
+- [ ] 17. clean up business questions
+- [ ] 18. clean up seeds
+- [ ] 19. review macros
 
 
 
 
 
-- [ ] 16. summary of project
+- [ ] 17. summary of project
   - could have used seeds for sources instead of staging in snowflake — the two seeds in the project (`known_amenity_names`, `known_verification_methods`) are pinned value lists rather than source data, and they show the tradeoff: regenerable by macro and they make the generated flag columns a committed decision instead of a function of today's rows, but `dbt test` and `dbt run` both now need `dbt seed` to have run first, and the models carry an explicit `-- depends_on:` because a `ref()` inside a macro is invisible to the parser
   - could consider incrementals, particulary for calendar & amenities changelog if they were big enough
   - amenities changelog is kind of a snapshot already (SCD2)
@@ -43,10 +47,11 @@
     - CI pre commit config (linter, maybe description check?)
     - Skills to add new possible columns
     - when I used AI vs not
-- [ ] 17. next steps
+- [ ] 18. next steps
   - figure out how to best maximize the context layer / make it available in tools like Claude or Snowflake directly (some agent) - real testing
   - combine / collapse some amenities
   - monitor noise of skills
   - set up monitoring on tables (tools like Monte Carlo), might be built in, might need to distinguish between layers what is necessary
   - similarity assessment of metrics
   - extend wake up ae to semantic view additions
+  - other sources needed

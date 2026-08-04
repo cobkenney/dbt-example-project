@@ -1,7 +1,8 @@
 {#
     Route each layer to its own schema so permissions can be granted per
-    schema: analytics_stg, analytics_int, and one schema per mart (core_mart).
-    The schema name comes from the `+schema:` config in dbt_project.yml.
+    schema: analytics_stg, analytics_int, analytics_seed, and one schema per
+    mart (core_mart). The schema name comes from the `+schema:` config in
+    dbt_project.yml.
 
     dbt's built-in behaviour concatenates the profile schema with `+schema:`
     (giving `dbt_ckenney_core_mart`), which is what we want in dev — one

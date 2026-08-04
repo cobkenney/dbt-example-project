@@ -15,7 +15,7 @@ rentals:
       threads: 8
 
     # Only `prod` gets the bare schema names (analytics_stg / analytics_int /
-    # core_mart) that grants are written against — see
+    # analytics_seed / core_mart) that grants are written against — see
     # macros/generate_schema_name.sql. The `schema` below is the fallback for
     # models with no `+schema:` config; layer models ignore it.
     prod:

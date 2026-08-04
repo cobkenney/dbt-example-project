@@ -13,24 +13,28 @@ source.
 > build. They are a **regression baseline**: their value is that a rebuild
 > disagreeing with them is a signal worth chasing. Do not quote them as the
 > current state of the data — query the models for that. Comments inside the
-> models, and the `COMMENT` text on the semantic views, are deliberately
-> figure-free for the same reason: they describe what a column means, which is
-> durable, rather than what it currently holds, which is not.
+> models, and the `COMMENT` and `AI_SQL_GENERATION` text on the semantic views,
+> are deliberately figure-free for the same reason: they describe what a column
+> means, which is durable, rather than what it currently holds, which is not. A
+> natural-language client reads that view text and would quote a number in it as
+> fact.
 
 ## Layer map
 
 | Layer | Folder | Responsibility | Materialization |
 |---|---|---|---|
+| Seed | `../seeds/` | Pinned vocabularies the intermediate models loop over. An input to the graph, not a transformation of one. | table (seed) |
 | Staging | `staging/` | Cast, dedupe, rename. One model per source table. | view |
 | Intermediate | `intermediate/` | Reshape: flatten JSON, join the daily grain, collapse dates into windows. No cleaning. | table |
 | Marts | `marts/core_mart/` | What analysts query. No cleaning or casting. | table |
+| Context | `marts/core_context_layer/` | What a natural-language client reads to learn what the tables mean. Stores no rows. | semantic view |
 
 Column descriptions shared across models live once in [docs.md](docs.md) and
 are referenced with `{{ doc('...') }}`. Columns that only look shared are
 deliberately absent from it — `price` most notably, since the calendar's nightly
 rate and the host's advertised rate are different measures with the same name.
 
-Four topics span all three layers and are documented once, at the bottom:
+Four topics span every layer and are documented once, at the bottom:
 [PII handling](#pii-handling), [orphan listing
 276450](#orphan-listing-276450), [test severity](#test-severity), and the
 [business questions](#business-questions).
@@ -620,6 +624,17 @@ So the lists moved into seeds, and the loops read the seeds:
 | 81 amenities | `seeds/known_amenity_names.csv` | `get_amenity_names()` → `int_listing_daily` |
 | 11 methods | `seeds/known_verification_methods.csv` | `get_verification_methods()` → `int_hosts` |
 
+Referenced directly with `ref()`. **No staging model over a seed** — staging
+exists to make an untrusted input trustworthy, and there is nothing to cast,
+rename or clean in a file this project generates and commits itself. Both seeds
+land in their own `analytics_seed` schema rather than in `analytics_stg` or
+`analytics_int`: a seed can only be a table, so it would be the staging schema's
+one exception to `+materialized: view`, and calling it intermediate would claim
+it was derived when it is an input. Because the `ref()` sits inside the macro,
+where dbt's parser cannot see it, `int_listing_daily` and `int_hosts` each
+declare an explicit `-- depends_on:` — delete either line and dbt still parses,
+compiles and runs, it just stops waiting for the seed.
+
 **The generated column list is now a committed file.** A value appearing or
 disappearing in the source cannot add or drop a column — only a diff to the seed
 can. That is the guarantee worth having: a schema change on a table five models
@@ -712,6 +727,184 @@ derived-source caveats that apply to anything reported off this table.
 `check_in_month` is precomputed for the same reason `fct_listing_daily`
 precomputes `month_start_date`. Keyed on check-in, so a stay crossing a month
 boundary counts in the month it started.
+
+---
+
+# Context layer — `core_context_layer`
+
+Snowflake semantic views over `core_mart` — the layer a natural-language client
+(Cortex Analyst, or anything else turning English into SQL) reads to learn what
+the tables mean. It stores no rows and transforms nothing; it names the tables,
+their join paths and the metrics, so "what was occupancy last quarter" resolves
+to one agreed definition instead of whatever the asker wrote.
+
+Built with [Snowflake-Labs/dbt_semantic_view](https://github.com/Snowflake-Labs/dbt_semantic_view),
+pinned in `packages.yml` — dbt has no native `CREATE SEMANTIC VIEW` and that
+package is Snowflake's own. The model body **is** the DDL from `TABLES(...)`
+onward, not a `select`.
+
+**Why each view exists, what its own metrics mean, and what makes a plausible
+query wrong are argued in the view file headers and in the `COMMENT` text
+itself** — that is where somebody editing a view will actually read them. What
+follows is what no single view file can own: the split across four views, the
+figures that only reconcile when compared, and the properties of the Snowflake
+feature established by probing this account.
+
+## Four views, one per grain of additive measure
+
+A semantic view will aggregate across a join and Snowflake raises **no error**
+when the join fans out, so each view exposes exactly one grain of additive
+measure and every other table joins in dimension-only. The full argument is in
+the [sem_listing_daily](marts/core_context_layer/sem_listing_daily/sem_listing_daily.sql)
+header.
+
+| View | Measure table (grain) | Dimension-only | Questions |
+|---|---|---|---|
+| `sem_listing_daily` | `fct_listing_daily` — listing × date | `dim_listings`, `dim_hosts` | 1, 2, 3, 6, 10, 15, 16, 22, 26, 27 |
+| `sem_reservations` | `fct_reservations` — listing × reservation | `dim_listings`, `dim_hosts` | 17, 23, 24 |
+| `sem_listing_performance` | `dim_listings` — listing, lifetime | `dim_hosts` | 4, 5, 7, 8, 9, 11, 12, 13, 14, 25 |
+| `sem_host_performance` | `dim_hosts` — host, lifetime | — | 18, 19, 20, 21 |
+
+That covers 27 of the 28 questions in
+[BUSINESS_QUESTIONS.md](../../BUSINESS_QUESTIONS.md); only #28 (repeat bookings)
+is out, for lack of a guest key in the source.
+
+**The split is verified, not asserted.** Asking `sem_listing_daily` for
+`listing.total_revenue` by month fails to compile — that metric does not exist in
+that view. The double-count is unwritable rather than merely discouraged.
+
+`sem_host_performance` exists as a fourth view because host-weighted and
+listing-weighted figures are different numbers and both are legitimate: overall
+occupancy is **55.9%** host-weighted against **54.2%** night-weighted. Its header
+argues the case; it is also the only view with no `RELATIONSHIPS` clause.
+
+**Revenue does not reconcile across all four, by construction.** Three views
+report $1,684,864; `sem_host_performance` reports **$1,608,344**, short by exactly
+the $76,520 belonging to orphan listing 276450, which has no `listings` row and
+therefore no host to attribute revenue to. That view's `COMMENT` and
+`AI_SQL_GENERATION` both say so, so a client reports the gap rather than
+presenting a false reconciliation.
+
+## What semantic views cannot express
+
+- **Window functions**, so questions 3 and 26 (gap-and-island over availability
+  runs) cannot be a plain `SEMANTIC_VIEW(...)` query. They work CTE-wrapped.
+
+  **This limitation moved a column upstream.** The gap-and-island now lives on
+  `fct_listing_daily` as `availability_window_seq`, so `sem_listing_daily`
+  exposes it as an ordinary dimension and both questions group on it instead of
+  restating the window function. They stay CTE-wrapped — the aggregation is
+  two-level and question 3's `least(window, cap)` is arithmetic across two
+  aggregates — but what the view could not express is now precomputed rather than
+  absent. See [Collapsed models](#collapsed-models).
+- **Ranking**, so question 7 (share of revenue from the top 5 listings) has **no
+  metric** in `sem_listing_performance`. A metric that quietly returned something
+  adjacent would be reported as the answer; better absent, with the comment
+  saying to rank outside the view.
+- **`LABELS = (FILTER)`** — documented by Snowflake, rejected as a syntax error
+  by the version this account runs. The intent lives in the `COMMENT` and
+  `AI_SQL_GENERATION` instead.
+- **A metric and a fact sharing a name.** They share one namespace, so the host
+  view's roll-ups are prefixed `portfolio_*` where they would otherwise collide.
+
+**`sqlfluff` excludes this folder.** Semantic-view DDL is not a `select` and the
+snowflake dialect cannot parse it, so every file there fails with "unparsable
+section" regardless of formatting. Snowflake is the parser that matters — `dbt
+run` fails outright on a malformed clause, which is stricter than the linter was.
+
+**No column docs and no `data_tests`.** A semantic view exposes metrics and
+dimensions rather than columns, so `dbt test` has nothing to attach to — a
+generic test cannot reach a metric. Grain and reconciliation tests live on the
+underlying marts, which is the right place: if `fct_listing_daily` is sound, a
+view over it cannot invent a wrong number, only expose it under a wrong name.
+Pinning names to figures is the job of the verified queries.
+
+`persist_docs` is explicitly unsupported for semantic views, so the `.yml`
+descriptions reach `dbt docs` and nothing else. The `COMMENT` clauses inside the
+DDL are what Snowflake stores and what Cortex Analyst reads to choose between
+metrics — which is why they carry the caveats verbatim rather than pointing here.
+
+## `AI_VERIFIED_QUERIES`
+
+A question-and-SQL pair per business question: what teaches Cortex Analyst the
+shape of a correct answer, and what pins each metric to a query whose result has
+been checked against the marts. All four views carry them.
+
+| View | Questions | Entries |
+|---|---|---|
+| `sem_listing_daily` | 1, 2, 3, 6, 10, 15, 16, 22, 26 | 46 |
+| `sem_listing_performance` | 4, 5, 7, 8, 9, 11, 12, 13, 14, 25, 27 | 47 |
+| `sem_reservations` | 17, 23, 24 | 14 |
+| `sem_host_performance` | 18, 19, 20 | 13 |
+
+Entries outnumber queries because several phrasings share one query — `QUESTION`
+is what a client matches against, so the spend goes where a plausible-but-wrong
+answer is easiest to get.
+
+**One macro per question** in [../macros/verified_queries/](../macros/verified_queries/),
+each returning `{name, question, sql}` entries; `ai_verified_queries()`
+dispatches by name and emits the whole clause, so each view file carries one
+line. Entry names stay `q17_a`, `q17_b` so they trace back to
+`BUSINESS_QUESTIONS.md`. Each macro's header records why its query is shaped the
+way it is — which is where the CTE wraps and the orphan-filter decisions are
+argued.
+
+**Question 21 has no entries**, alone among the 27. Trust-signal adoption needs a
+row per verification method, and the methods are only enumerable from
+`stg_listings` — a `ref()` out of `core_mart`, which this layer does not take.
+The question also has no finding to pin: 36 hosts against 11 methods is too few
+to conclude from. That view's `COMMENT` and `AI_SQL_GENERATION` say so instead.
+
+**Not yet validated** — TODO item 14.
+
+### Four properties established by probing, not documentation
+
+These change how the queries have to be written, and the documentation either
+omits or contradicts them.
+
+- **The SQL goes against these views' own metrics and dimensions**, in the
+  `SEMANTIC_VIEW(... METRICS ... DIMENSIONS ...)` form — not against `core_mart`
+  directly. Per Snowflake: "Verified SQL queries must use the names of the
+  logical tables and columns defined in the semantic model, not those in the
+  underlying dataset." A verified query exists to teach a client which metric
+  answers which question, and base-table SQL teaches it nothing about choosing
+  `avg_length_of_stay` over `avg_length_of_stay_all`. So the marts are what the
+  *figures* were verified against, not what the query text is written against.
+- **Snowflake does not validate the SQL at create time.** A verified query
+  selecting a nonexistent column from a nonexistent table was accepted and the
+  `CREATE` succeeded. A query that has silently rotted still builds green and
+  surfaces only when a client serves it as a correct answer — which is why the
+  validator in TODO item 14 is part of the work rather than a nicety.
+- **`QUESTION` is required and is the matching surface.** Omitting it fails with
+  `Property '[QUESTION]' must be specified` — Snowflake enforces the grammar
+  while ignoring whether the SQL is true. Because a client matches the asked
+  question against this text, it should read the way somebody would actually ask.
+- **Metrics need the explicit `SEMANTIC_VIEW(...)` form.** Selecting from a view
+  by name works for dimensions but fails on a metric with "must be one of the
+  following types: (DIMENSION, FACT)".
+
+**Apostrophes are escaped in the verified queries, unlike in `COMMENT` text**,
+where the convention is to write the prose around them. The dispatcher doubles
+them in both fields; query SQL needs it because a literal like
+`'entire home/apt'` is unavoidable.
+
+## Context-layer reference values
+
+Reproduced through the views and matching what the same question returns against
+`core_mart` directly. The column ranges are what a banding query needs.
+
+| Check | Value |
+|---|---|
+| Q1 revenue without AC | 21.2% of July 2022 revenue |
+| Q3 longest picky-renter stay | 1303261 → 159 nights; 182613 → 112 |
+| Q17 reservations | 1,565 bookings / 10,059 nights / 6.4910 vs 6.4275 nights / $1,076.59 / 70 censored |
+| Q19 multi vs single host | 7 hosts → $19,267.27 / 38.46% / 6.2516; 29 hosts → $39,748.97 / 60.05% / 6.1098 |
+| Q22 price per bedroom and bed | entire home $216.84 / $165.68 / $128.10; private room $89.11 / $85.74 / $84.15 |
+| Q26 unbookable windows | 59 of 204 windows / 300 nights / $64,062 asked, 4.48% of the $1,430,664 in open inventory |
+| Availability windows | 204 across 50 listings; `minimum_nights` varies inside 7; the owner cap binds in 8 |
+| `review_scores_rating` | 0.00 to 5.00, NULL on 3 listings |
+| `list_price` | $25 to $571 |
+| `minimum_nights` | 1 to 180, 13 distinct values |
 
 ---
 
@@ -840,8 +1033,8 @@ question in
 [../macros/verified_queries/](../macros/verified_queries/). Each macro's header
 records why its query is shaped the way it is and what the plausible wrong answer
 would be; the query itself is the executable form. See
-[core_context_layer/README.md](marts/core_context_layer/README.md) for how they
-are wired and which view carries which question.
+[`AI_VERIFIED_QUERIES`](#ai_verified_queries) for how they are wired and which
+view carries which question.
 
 Results below were verified against the intermediate models at the date in the
 header above.
