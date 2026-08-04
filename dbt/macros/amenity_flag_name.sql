@@ -58,7 +58,7 @@
     between runs.
 
     READS THE SEED, NOT THE DATA. seeds/known_amenity_names.csv is the committed
-    list of the 81 amenities, and it is the same list the relationships test on
+    list of the amenities, and it is the same list the relationships test on
     int_listing_amenities checks against — so the generated flag columns and the
     test can never disagree about what exists.
 

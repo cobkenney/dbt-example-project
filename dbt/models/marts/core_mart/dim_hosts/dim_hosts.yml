@@ -72,15 +72,14 @@ models:
 
       - name: is_verified_reviews
         description: >
-          Whether the host has been verified by platform reviews — 34 of 36
-          hosts. The most discriminating of the common methods.
+          Whether the host has been verified by platform reviews. The most
+          discriminating of the common methods.
         data_tests:
           - not_null
 
       - name: is_verified_kba
         description: >
-          Whether the host completed knowledge-based authentication — 18 of 36
-          hosts.
+          Whether the host completed knowledge-based authentication.
         data_tests:
           - not_null
 
@@ -96,33 +95,32 @@ models:
 
       - name: is_verified_jumio
         description: >
-          Whether the host was verified through Jumio, a third-party ID
-          vendor — 10 of 36 hosts.
+          Whether the host was verified through Jumio, a third-party ID vendor.
         data_tests:
           - not_null
 
       - name: is_verified_facebook
         description: >
-          Whether the host linked a Facebook account — 10 of 36 hosts. A social
-          signal, not an identity check.
+          Whether the host linked a Facebook account. A social signal, not an
+          identity check.
         data_tests:
           - not_null
 
       - name: is_verified_selfie
-        description: Whether the host submitted a selfie match — 5 of 36 hosts.
+        description: Whether the host submitted a selfie match.
         data_tests:
           - not_null
 
       - name: is_verified_identity_manual
         description: >
-          Whether the host was verified by manual review — 4 of 36 hosts.
+          Whether the host was verified by manual review.
         data_tests:
           - not_null
 
       - name: is_verified_work_email
         description: >
-          Whether the host verified a work email address — 4 of 36 hosts.
-          Distinct from is_verified_email, which every host has.
+          Whether the host verified a work email address. Distinct from
+          is_verified_email, which every host has.
         data_tests:
           - not_null
 
@@ -135,9 +133,9 @@ models:
       # true or false.
       - name: is_multi_listing_host
         description: >
-          True where the host holds more than one listing — 7 of 36 hosts. The
-          segmentation for professional-operator vs casual-host questions, since
-          the two are different business relationships with different economics.
+          True where the host holds more than one listing. The segmentation for
+          professional-operator vs casual-host questions, since the two are
+          different business relationships with different economics.
 
       - name: calendar_days
         description: Total calendar days across all the host's listings.

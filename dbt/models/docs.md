@@ -4,8 +4,17 @@
     Every block here describes a column that appears in more than one model and
     genuinely means the same thing in each — so the wording lives once and the
     models reference it with `{{ doc('...') }}`. Where a model needs to add
-    something specific (a primary-key claim, an orphan-row count), it appends a
-    sentence after the doc reference rather than restating the shared part.
+    something specific (a primary-key claim, a note about which test guards a
+    premise), it appends a sentence after the doc reference rather than
+    restating the shared part.
+
+    These describe columns, not the rows currently in them. Row counts,
+    distinct-value counts, ID values, and date ranges are deliberately absent:
+    a description that quotes a figure goes wrong silently the next time the
+    source loads, and nothing fails. Where a distribution or a boundary matters
+    to how the column should be used, the wording states the shape and names the
+    test that holds it — a test reports the current number when it fires, which
+    is the only place a number stays true.
 
     Columns that only look shared are deliberately absent. `price` is the
     clearest case: on the calendar it is the nightly rate for one date, while on
@@ -23,10 +32,9 @@
 {% docs listing_id %}
 Identifier of the rental listing. Joins every model in the project together.
 
-50 distinct listings appear across the calendar and changelog; one of them
-(276450) is missing from the raw listings table, so models that carry
-descriptive attributes leave them NULL for that listing rather than dropping
-the rows.
+The calendar and changelog cover more listings than the raw listings table does,
+so models that carry descriptive attributes leave them NULL for the missing ones
+rather than dropping the rows. See is_orphan_listing.
 {% enddocs %}
 
 {% docs calendar_id %}
@@ -56,9 +64,9 @@ the salt is what prevents recovering a first name by hashing a name list. Use
 host_id for joins — it identifies a host directly and is stable across salt
 rotations, which change every hash here.
 
-Note that host names are not unique in this data: 36 hosts hold 35 distinct
-names, so two different hosts share a name and therefore share a hash. Never
-treat this as a host identifier.
+Note that host names are not unique: distinct hosts can share a name and
+therefore share a hash. Never treat this as a host identifier — nothing tests
+this column for uniqueness, because it is not expected to hold.
 
 See macros/mask_pii.sql. The plaintext still exists in RAW_DATA, which dbt
 cannot reach — that needs a Snowflake masking policy.
@@ -70,9 +78,9 @@ cannot reach — that needs a Snowflake masking policy.
 {% docs host_since %}
 Date the host joined the platform.
 
-Clusters in 2008–2009 for 49 of 50 listings, matching the first amenity-changelog
-event — these are long-tenured hosts, so tenure has little variance to explain
-performance with on this data.
+Tightly clustered in this data — nearly every host joined in the same two-year
+window, so tenure has little variance to explain performance with. Check the
+spread before using it as an explanatory variable.
 {% enddocs %}
 
 {% docs host_location %}
@@ -92,19 +100,18 @@ column. `contains(host_verifications, 'government_id')` also matches
 `offline_government_id`, and `'email'` also matches `'work_email'`.
 
 Both of those return the correct answer on today's data only by luck: each
-narrower method happens to be a strict subset of the broader one (10 of the 16
-government_id hosts also have offline, 4 of 36 email hosts also have work_email).
-Nothing enforces that, so the substring shortcut is a latent bug rather than a
-live one — which is a worse thing to leave in a query, because it will pass
-review.
+narrower method happens to be a strict subset of the broader one. Nothing
+enforces that, so the substring shortcut is a latent bug rather than a live one —
+which is a worse thing to leave in a query, because it will pass review.
 {% enddocs %}
 
 {% docs verification_method %}
 One verification method a host has completed, unflattened from the raw array.
 
-11 distinct methods across 36 hosts: email 36, phone 36, reviews 34, kba 18,
-government_id 16, jumio 10, facebook 10, offline_government_id 10, selfie 5,
-identity_manual 4, work_email 4.
+The set of methods in use is enumerated in `seeds/known_verification_methods.csv`,
+which this column is relationships-tested against at `severity: warn` — that
+warning (`warn_new_verification_method`) is what announces a method the project
+has not seen before.
 
 Note that `government_id` and `offline_government_id` are separate values, as are
 `email` and `work_email` — so substring matching on the raw array conflates each
@@ -115,13 +122,13 @@ is a strict subset of the broader one in both cases; nothing guarantees that.
 {% docs verification_count %}
 Number of distinct verification methods the host has completed.
 
-Ranges 2–9 across the 36 hosts, clustering at 4–6 (24 of 36). Every host has at
-least email and phone, so 2 is the floor on this data rather than a designed
-minimum — if that ever changes, `is_verified_email` is what makes it visible.
+The floor on this data comes from every host happening to hold the same couple of
+baseline methods, not from a designed minimum — if that changes,
+`is_verified_email` and `is_verified_phone` are what make it visible.
 
 NULL, not 0, for a host with no rows in int_host_verifications — an empty or
-unparseable array. There are none today, and the left join keeps that
-distinguishable from a host verified by nothing.
+unparseable array. The left join keeps that distinguishable from a host verified
+by nothing.
 {% enddocs %}
 
 {% docs verification_list %}
@@ -129,51 +136,51 @@ Array of the host's verification methods.
 
 Redundant with the generated `is_verified_*` flags for filtering. Kept because it
 survives the source adding a new method without a schema change, and because it
-reads better than 11 booleans when you just want to see what a host has.
+reads better than a row of booleans when you just want to see what a host has.
 {% enddocs %}
 
 {% docs is_verified_email %}
 Whether the host has a verified email address. Generated flag.
 
-True for all 36 hosts, so it has no analytical use — it is kept as a tripwire.
-A universally-true flag is the only thing that makes its own violation visible:
-the day a host lands without a verified email this goes false and is queryable,
-which is impossible if the column was dropped for carrying no signal.
+Universally true on this data, so it has no analytical use — it is kept as a
+tripwire. A universally-true flag is the only thing that makes its own violation
+visible: the day a host lands without a verified email this goes false and is
+queryable, which is impossible if the column was dropped for carrying no signal.
 
-Filter on this expecting variance and you will get every host back.
+Filter on this expecting variance and you may get every host back.
 {% enddocs %}
 
 {% docs is_verified_phone %}
 Whether the host has a verified phone number. Generated flag.
 
-True for all 36 hosts. Kept as a tripwire for the same reason as
+Universally true on this data. Kept as a tripwire for the same reason as
 is_verified_email — see that column's description.
 {% enddocs %}
 
 {% docs is_verified_government_id %}
-Whether the host completed government ID verification — 16 of 36 hosts.
-Generated flag.
+Whether the host completed government ID verification. Generated flag.
 
 Distinct from is_verified_offline_government_id, a separate method. On this data
-all 10 offline hosts also have this flag, so the two are nested rather than
-disjoint — do not add them together expecting 26 hosts. The source treats them as
+every offline host also carries this flag, so the two are nested rather than
+disjoint — do not add them together expecting a total. The source treats them as
 different processes, so that nesting is a property of the snapshot, not a rule.
 {% enddocs %}
 
 {% docs is_verified_offline_government_id %}
 Whether the host completed government ID verification through the offline
-channel — 10 of 36 hosts. Generated flag.
+channel. Generated flag.
 
-All 10 also carry is_verified_government_id, so this is a subset of that flag on
-this data. Exists separately because the source treats it as its own method, and
-because substring-matching `government_id` on the raw array cannot tell them
-apart — a shortcut that works only while the nesting holds.
+Every host carrying this also carries is_verified_government_id, so this is a
+subset of that flag on this data. Exists separately because the source treats it
+as its own method, and because substring-matching `government_id` on the raw
+array cannot tell them apart — a shortcut that works only while the nesting
+holds.
 {% enddocs %}
 
 {% docs listing_count %}
 Number of listings the host holds.
 
-29 of 36 hosts hold exactly one; the largest holds 5. Compare hosts on
+Most hosts hold exactly one, with a thin tail above that. Compare hosts on
 revenue_per_listing rather than total_revenue, which scales with this by
 construction.
 {% enddocs %}
@@ -190,7 +197,7 @@ Booked nights divided by calendar days, summed across the host's listings before
 dividing.
 
 Portfolio-weighted on purpose: averaging per-listing rates would let a listing
-with 30 calendar days count as much as one with 365.
+with a short calendar window count as much as one covering the full year.
 {% enddocs %}
 
 {% docs host_avg_nights_per_stay %}
@@ -206,8 +213,9 @@ censored, or where the host has none.
 {#-- Dates and the daily grain ---------------------------------------------#}
 
 {% docs calendar_date %}
-Date the row describes. The calendar spans 2021-07-12 to 2022-07-11 — a fixed
-one-year snapshot, not a rolling window.
+Date the row describes. The calendar is a fixed one-year snapshot, not a rolling
+window — see as_of_date for the reference point every age and tenure measure in
+the marts is anchored to.
 {% enddocs %}
 
 {% docs is_available %}
@@ -216,8 +224,8 @@ reserved. Revenue accrues only on unavailable (booked) nights.
 {% enddocs %}
 
 {% docs as_of_date %}
-Last date in the calendar snapshot (2022-07-11) — the reference point for every
-age or tenure measure in the marts. Constant across every row.
+Last date in the calendar snapshot — the reference point for every age or tenure
+measure in the marts. Constant across every row.
 
 Carried as a column rather than left implicit so a figure measured against it can
 be reproduced later, and so nobody assumes `current_date` was used. It was not,
@@ -269,7 +277,7 @@ instead of writing the gap-and-island window function themselves.
 
 Computed with `lag(is_available)`, coalesced to false so the first row of each
 listing counts as a start when it is available. `sum()` of this column is the
-number of availability windows a listing has — 204 across the 50 listings.
+number of availability windows a listing has.
 {% enddocs %}
 
 {% docs availability_window_seq %}
@@ -287,21 +295,21 @@ actually is.
 
 Two rules this column does NOT encode, both of which produce a plausible wrong
 answer and neither of which lives here — see
-`analyses/03_long_stay_picky_renter.sql`:
+`macros/verified_queries/verified_queries_q03.sql`:
 
 1. **Window length is `count(*)`, not `datediff(min, max)`**, which is one lower.
-   Every available date is a bookable night: 2022-02-03 through 2022-07-11 is 159
-   nights, not 158.
+   Every available date is a bookable night, so both endpoints count.
 2. **Longest bookable stay is `least(window_length, maximum_nights)`.** Both
-   constraints bind in this data — the window usually, the owner's cap in 8 of
-   204 windows — so neither column alone answers "longest possible stay."
-   `tests/assert_stay_cap_binds.sql` guards that premise.
+   constraints bind in this data — the window usually, the owner's cap on a
+   minority of windows — so neither column alone answers "longest possible
+   stay." `tests/assert_stay_cap_binds.sql` guards that premise, and fails if
+   the cap stops binding anywhere.
 
-Depends on the calendar being gap-free per listing, which it is: 50 listings ×
-365 dates, no gaps and no duplicate dates. A missing date would merge the runs on
-either side of it into one window, where the older `date - row_number()` form
-would have split them. The `calendar_id` uniqueness test plus `calendar_date`
-being not-null is what keeps that assumption honest.
+Depends on the calendar being gap-free per listing, with no duplicate dates. A
+missing date would merge the runs on either side of it into one window, where the
+older `date - row_number()` form would have split them. The `calendar_id`
+uniqueness test plus `calendar_date` being not-null is what keeps that assumption
+honest.
 {% enddocs %}
 
 
@@ -310,10 +318,11 @@ being not-null is what keeps that assumption honest.
 {% docs reservation_key %}
 Surrogate key over (listing_id, reservation_id). Unique per reservation.
 
-Needed because reservation_id is **not** unique on its own: id 836 covers two
-separate one-night stays, on listings 753446 and 801680, both on 2021-07-12.
-Grouping on reservation_id alone would merge them into one impossible 2-night
-reservation spanning two properties, so join and count on this column.
+Needed because reservation_id is **not** unique on its own — the same id can
+appear on two different listings, covering two separate stays. Grouping on
+reservation_id alone would merge those into one impossible reservation spanning
+two properties, so join and count on this column. `unique` on this column is
+what asserts the per-reservation grain.
 {% enddocs %}
 
 {% docs check_in_date %}
@@ -361,9 +370,8 @@ assumption fails the build rather than quietly inflating length of stay.
 {% enddocs %}
 
 {% docs is_reservation_censored %}
-True when the reservation touches an edge of the calendar snapshot
-(2021-07-12 or 2022-07-11), meaning nights outside the loaded year are not
-counted.
+True when the reservation touches either edge of the calendar snapshot, meaning
+nights outside the loaded year are not counted.
 
 `nights` is then a floor on the true stay length, not the stay length. Exclude
 censored reservations before reporting average length of stay, or the average is
@@ -375,10 +383,11 @@ biased downward — long stays are the ones most likely to cross an edge.
     Availability windows had five doc blocks here — window_start_date,
     window_end_date, window_length_nights, longest_possible_stay_nights, and
     availability_window_id. All five went when the two windows models were
-    collapsed into analyses/03_long_stay_picky_renter.sql; no model declares
-    those columns now, and a doc block with no consumer is a maintenance trap.
+    collapsed into the query that needed them; no model declares those columns
+    now, and a doc block with no consumer is a maintenance trap.
 
-    The two facts worth keeping are in that analysis's header, where the person
+    The two facts worth keeping are in the header of
+    macros/verified_queries/verified_queries_q03.sql, where the person
     re-deriving windows will actually see them: window length is count(*) and
     not datediff (off by one), and the longest bookable stay is
     least(window, maximum_nights) because both constraints bind. See also
@@ -413,28 +422,28 @@ listings table.
 {% enddocs %}
 
 {% docs bedrooms %}
-Number of bedrooms, ranging 1-4. Never 0, but **NULL on 8 of 49 listings** where
-the host left it unset — and NULL where the listing is absent from the raw
-listings table.
+Number of bedrooms. Never 0 in this data, but **NULL on a meaningful share of
+listings** where the host left it unset — and NULL where the listing is absent
+from the raw listings table.
 
-Price-per-bedroom is therefore NULL for those 8 rather than wrong. No div0 needed
-since 0 never occurs, but expect the denominator to be missing for ~16% of
-listings — all 8 are entire homes, so that layer's figures rest on 23 listings
-rather than 31.
+Price-per-bedroom is therefore NULL for those rather than wrong. No div0 needed
+while 0 never occurs, but expect the denominator to be missing often enough to
+matter. The gaps fall on entire homes, so any figure cut that way rests on fewer
+listings than the segment's total.
 {% enddocs %}
 
 {% docs beds %}
 Number of beds, which may exceed `bedrooms` for multi-bed rooms. Never NULL in
-the current data, but **0 on 4 of 49 listings** — and NULL where the listing is
+the current data, but **0 on some listings** — and NULL where the listing is
 absent from the raw listings table.
 
 The opposite failure mode to `bedrooms`: always populated, but dividing by it
-needs div0 or nullif for those 4, otherwise price-per-bed errors out. One listing
-records 1 bedroom and 0 beds, so the two columns disagree rather than one being a
-clean fallback for the other.
+needs div0 or nullif, otherwise price-per-bed errors out on the zeros. A listing
+can record bedrooms with 0 beds, so the two columns disagree rather than one being
+a clean fallback for the other.
 
-Both gaps fall entirely on entire homes; private rooms have complete data for
-both columns.
+Both gaps fall on entire homes; private rooms have complete data for both columns
+in this snapshot.
 {% enddocs %}
 
 
@@ -484,10 +493,13 @@ Whether the listing offers a kitchen. Exact match on the "Kitchen" amenity.
 
 {% docs is_orphan_listing %}
 True where the listing appears in the calendar and changelog but not in the raw
-listings table — listing 276450, covering 365 calendar rows and $2,200 of booked
-revenue.
+listings table, so every descriptive column is NULL for it.
 
-Joins are left joins throughout so these rows survive. Consumers should include
-or exclude them explicitly: excluding them shifts the July 2022 no-AC revenue
-share from 21.2% to 22.1%.
+Computed once, in `int_listings`, and read by every model that carries it. Joins
+are left joins throughout so these rows survive, and they carry real booked
+revenue — `tests/assert_orphan_listing_count.sql` pins how many orphans there are
+and warns when that changes.
+
+Consumers should include or exclude them explicitly rather than by accident:
+excluding them moves revenue-share figures by enough to notice.
 {% enddocs %}

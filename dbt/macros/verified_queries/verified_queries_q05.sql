@@ -6,12 +6,13 @@
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    The named listings are 1454258, 1510876 and 743759: available all 365 nights
-    and never booked, so the question behind the question is price, photos or
-    location.
+    A handful of listings qualify: available every night of the window and never
+    booked, so the question behind the question is price, photos or location. The
+    detail entry names the current ones, which is why it is here rather than a
+    count alone.
 
     was_never_booked is a derived dimension on the view - total_revenue = 0 -
-    which matters because total_revenue is ZERO and not NULL for these three.
+    which matters because total_revenue is ZERO and not NULL for these listings.
     A client testing `total_revenue is null` finds nothing and reports that every
     listing earned something.
 

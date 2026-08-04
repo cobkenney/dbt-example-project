@@ -13,7 +13,10 @@ with calendar as (
 
 listings as (
 
-    select * from {{ ref('stg_listings') }}
+    -- int_listings rather than stg_listings, so the orphan flag below is read
+    -- rather than derived. int_listings covers every listing the calendar
+    -- references, which means the join finds a row for every calendar row.
+    select * from {{ ref('int_listings') }}
 
 ),
 
@@ -28,7 +31,7 @@ amenities as (
     -- fan out the daily grain no matter how many amenities a listing has.
     --
     -- One boolean per amenity in seeds/known_amenity_names.csv, generated
-    -- rather than hardcoded, so all 81 amenities get a flag without 81 lines.
+    -- rather than hardcoded, so every amenity gets a flag without a line each.
     --
     -- The loop reads the SEED, not the data. That is what keeps this column
     -- list pinned: an amenity appearing or disappearing upstream changes
@@ -53,10 +56,10 @@ amenities as (
         array_agg(distinct amenity_name) as amenity_list,
 
         -- LT02/LT05 are disabled for the loop body only. sqlfluff lints the
-        -- compiled output, where one generated identifier runs 71 characters
-        -- (has_65_inch_hdtv_...) — no source formatting brings that under the
-        -- 80-char limit, and the loop's indentation is set by Jinja whitespace
-        -- control rather than by layout.
+        -- compiled output, where the longest generated identifier overruns the
+        -- 80-char limit on its own — no source formatting brings it under, and
+        -- the loop's indentation is set by Jinja whitespace control rather than
+        -- by layout.
         -- noqa: disable=LT02,LT05
         {%- for amenity_name in get_amenity_names() %}
         boolor_agg(amenity_name = {{ sql_string_literal(amenity_name) }}) as {{ amenity_flag_name(amenity_name) }}{{ "," if not loop.last }}
@@ -94,16 +97,18 @@ joined as (
         listings.host_id,
 
         -- Flags the calendar rows whose listing never loaded, so marts can
-        -- include or exclude them explicitly rather than by accident.
-        listings.listing_id is null as is_orphan_listing,
+        -- include or exclude them explicitly rather than by accident. Read from
+        -- int_listings, which owns the rule — this model and dim_listings each
+        -- used to derive it from their own left join to stg_listings.
+        listings.is_orphan_listing,
 
         amenities.amenity_count,
         amenities.amenity_list,
 
-        -- All 81 generated flags, named by the same loop over the same seed
+        -- Every generated flag, named by the same loop over the same seed
         -- that built them rather than pulled in with amenities.*, so the
         -- compiled SQL states its own column list. The marts downstream
-        -- deliberately narrow this to the six flags they use — see
+        -- deliberately narrow this to the handful of flags they use — see
         -- fct_listing_daily and dim_listings.
         -- noqa: disable=LT02,LT05
         {%- for amenity_name in get_amenity_names() %}
@@ -112,10 +117,14 @@ joined as (
     -- noqa: enable=all
 
     from calendar
-    -- Left, not inner: an inner join drops listings with no bookings
+    -- Left, not inner. int_listings covers every listing the calendar
+    -- references, so the two are equivalent today — but an inner join would
+    -- respond to that stopping being true by silently dropping calendar rows,
+    -- where the left join leaves is_orphan_listing NULL and its not_null test
+    -- says so.
     left join listings on calendar.listing_id = listings.listing_id
-    -- Left for the orphan's sake too, though today the changelog covers all 50
-    -- listings the calendar references. amenity_count's not_null is the
+    -- Left for the orphans' sake too, though today the changelog covers every
+    -- listing the calendar references. amenity_count's not_null is the
     -- tripwire for that stopping being true.
     left join amenities on calendar.listing_id = amenities.listing_id
 
@@ -132,16 +141,16 @@ window_starts as (
     -- referenced by the sum() over it in the same select list.
     --
     -- WHY THIS SHAPE, and not the `calendar_date - row_number()` form that
-    -- analyses/03 and tests/assert_stay_cap_binds use: that one only works on a
+    -- tests/assert_stay_cap_binds uses: that one only works on a
     -- rowset already filtered to available nights, so it can never be a column
     -- here. This one is computed over the whole calendar, which is what lets
     -- the run identity be carried on the fact table.
     --
     -- It costs an assumption in exchange. The row_number form needs no
     -- contiguous calendar; this one does, because a missing date would merge
-    -- the runs on either side of it rather than splitting them. Verified: 50
-    -- listings x 365 dates, no gaps and no duplicates. calendar_id's uniqueness
-    -- test and calendar_date's not_null are the guards.
+    -- the runs on either side of it rather than splitting them. The calendar is
+    -- gap-free and duplicate-free per listing; calendar_id's uniqueness test
+    -- and calendar_date's not_null are the guards.
     --
     -- coalesce, not `is not true`: lag is NULL on each listing's first row, and
     -- without the default that row is never a window start even when available.

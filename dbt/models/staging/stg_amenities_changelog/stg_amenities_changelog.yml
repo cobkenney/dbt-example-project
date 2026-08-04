@@ -17,8 +17,9 @@ models:
         description: >
           {{ doc('listing_id') }}
 
-          References stg_listings.listing_id. 2 rows reference the missing
-          listing 276450 — warns rather than errors.
+          References stg_listings.listing_id, but some rows reference a listing
+          absent from it — the same gap the calendar has. Warns rather than
+          errors so those rows survive into int_listings.
         data_tests:
           - not_null
           - relationships:
@@ -30,10 +31,10 @@ models:
 
       - name: changed_at
         description: >
-          When the amenity set changed. Two events per listing, the latest
-          being 2021-07-06 — every event predates the 2021-07-12 calendar
-          opening, which is what lets int_listing_amenities collapse to the
-          most recent event.
+          When the amenity set changed. Every event predates the calendar
+          window, which is what lets int_listing_amenities collapse to each
+          listing's most recent event — asserted by
+          tests/assert_amenities_predate_calendar.sql.
         data_tests:
           - not_null
 

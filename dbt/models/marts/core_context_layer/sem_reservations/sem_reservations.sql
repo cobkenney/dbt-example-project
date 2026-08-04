@@ -2,9 +2,10 @@
 -- reservation.
 --
 -- Separate from sem_listing_daily because the grains differ and cannot be mixed:
--- 1,565 reservations against 17,885 calendar rows. One view holding both would
--- let "reservations by month" join a booking against every night it occupies and
--- count it once per night. Snowflake returns that without complaint.
+-- one row per reservation here against one row per listing-night there. One view
+-- holding both would let "reservations by month" join a booking against every
+-- night it occupies and count it once per night. Snowflake returns that without
+-- complaint.
 --
 -- Answers business questions 17, 23 and 24.
 --
@@ -20,7 +21,7 @@ TABLES (
     reservation AS {{ ref('fct_reservations') }}
         PRIMARY KEY (reservation_key)
         WITH SYNONYMS = ('reservations', 'bookings', 'stays', 'trips')
-        COMMENT = 'One row per reservation. The key is reservation_key, NOT reservation_id - id 836 covers two separate one-night stays on listings 753446 and 801680, so grouping on reservation_id alone merges them into one impossible two-night reservation across two properties.',
+        COMMENT = 'One row per reservation. The key is reservation_key, NOT reservation_id - the same id can cover two separate stays on two different listings, so grouping on reservation_id alone merges them into one impossible reservation spanning two properties.',
 
     listing AS {{ ref('dim_listings') }}
         PRIMARY KEY (listing_id)
@@ -37,15 +38,15 @@ RELATIONSHIPS (
     reservation_to_listing AS reservation (listing_id)
         REFERENCES listing (listing_id),
 
-    -- The orphan listing has a NULL host_id, so its reservations drop out of any
-    -- host-grouped total. It does hold real bookings.
+    -- An orphan listing has a NULL host_id, so its reservations drop out of any
+    -- host-grouped total. They are real bookings carrying real revenue.
     listing_to_host AS listing (host_id) REFERENCES host (host_id)
 )
 
 FACTS (
     reservation.nights AS reservation.nights
         WITH SYNONYMS = ('length of stay', 'stay length', 'duration')
-        COMMENT = 'Nights occupied. CAVEAT: a floor rather than the true length on the 70 censored reservations, which are cut off by the edges of the snapshot. Filter is_censored to false before averaging this.',
+        COMMENT = 'Nights occupied. CAVEAT: a floor rather than the true length on the censored reservations, which are cut off by the edges of the snapshot. Filter is_censored to false before averaging this.',
 
     reservation.reservation_revenue AS reservation.reservation_revenue
         WITH SYNONYMS = ('booking value', 'stay revenue')
@@ -64,7 +65,7 @@ DIMENSIONS (
 
     reservation.listing_name AS reservation.listing_name
         WITH SYNONYMS = ('name', 'title')
-        COMMENT = 'Listing title, denormalized onto the fact. NULL for the orphan listing.',
+        COMMENT = 'Listing title, denormalized onto the fact. NULL for an orphan listing.',
 
     reservation.check_in_date AS reservation.check_in_date
         WITH SYNONYMS = ('arrival', 'start date')
@@ -90,19 +91,19 @@ DIMENSIONS (
     -- than two: either edge truncates a stay, so exposing left and right
     -- separately invites filtering one and forgetting the other.
     reservation.is_censored AS reservation.is_censored
-        COMMENT = 'True for the 70 reservations truncated by an edge of the snapshot, whose real length is unknown and whose nights is therefore a floor. EXCLUDE these when averaging length of stay - 6.49 nights excluding versus 6.43 including. KEEP them when counting bookings or totalling revenue, because those bookings really happened and their revenue is real.',
+        COMMENT = 'True for reservations truncated by an edge of the snapshot, whose real length is unknown and whose nights is therefore a floor. EXCLUDE these when averaging length of stay - including them pulls the mean DOWN, since every censored stay is recorded shorter than it really was. KEEP them when counting bookings or totalling revenue, because those bookings really happened and their revenue is real.',
 
     reservation.is_left_censored AS reservation.is_left_censored
-        COMMENT = 'True where the stay was already running when the snapshot opened on 2021-07-12. Prefer is_censored, which covers both edges.',
+        COMMENT = 'True where the stay was already running when the snapshot opened. Prefer is_censored, which covers both edges.',
 
     reservation.is_right_censored AS reservation.is_right_censored
-        COMMENT = 'True where the stay was still running when the snapshot closed on 2022-07-11. Prefer is_censored, which covers both edges.',
+        COMMENT = 'True where the stay was still running when the snapshot closed. Prefer is_censored, which covers both edges.',
 
     reservation.is_contiguous AS reservation.is_contiguous
         COMMENT = 'True where every night between check-in and the last night is occupied by this reservation, with no gap.',
 
     reservation.is_orphan_listing AS reservation.is_orphan_listing
-        COMMENT = 'True for reservations on listing 276450, which has no listings row, so its descriptive columns are NULL. Filter out when comparing attributes; leave in when totalling revenue or counting bookings.',
+        COMMENT = 'True for reservations on a listing that has no listings row, so its descriptive columns are all NULL. Filter out when comparing attributes; LEAVE IN when totalling revenue or counting bookings.',
 
     listing.neighborhood AS listing.neighborhood
         WITH SYNONYMS = ('area', 'district', 'location')
@@ -119,7 +120,7 @@ DIMENSIONS (
         COMMENT = 'Guest capacity.',
 
     listing.is_shared_bathroom AS listing.is_shared_bathroom
-        COMMENT = 'True where the bathroom is shared - 9 listings against 39 private.',
+        COMMENT = 'True where the bathroom is shared, which is a minority of listings.',
 
     listing.review_scores_rating AS listing.review_scores_rating
         COMMENT = 'Average review score. NULL for listings with no reviews.',
@@ -138,19 +139,19 @@ DIMENSIONS (
         COMMENT = 'Number of amenities on the listing.',
 
     host.is_multi_listing_host AS host.is_multi_listing_host
-        COMMENT = 'True where the host holds more than one listing - 7 of 36. Grouping by this drops the orphan listing, which has no host.',
+        COMMENT = 'True where the host holds more than one listing, which is a small minority of hosts. Grouping by this drops orphan listings, which have no host.',
 
     host.host_tenure_years AS host.host_tenure_years
-        COMMENT = 'Whole years between the host joining and 2022-07-11.'
+        COMMENT = 'Whole years between the host joining and the snapshot end, never current_date.'
 )
 
 METRICS (
     reservation.reservations AS count(*)
         WITH SYNONYMS = ('bookings', 'booking count', 'stays')
-        COMMENT = 'Number of reservations. 1,565 in total. Counts rows, so it is safe on the censored ones - do not filter is_censored here.',
+        COMMENT = 'Number of reservations. Counts rows, so it is safe on the censored ones - do NOT filter is_censored here.',
 
     reservation.booked_nights AS sum(reservation.nights)
-        COMMENT = 'Total nights occupied across the reservations in the slice. 10,059 overall.',
+        COMMENT = 'Total nights occupied across the reservations in the slice. Slightly understated by the censored stays, whose nights are a floor.',
 
     reservation.total_revenue AS sum(reservation.reservation_revenue)
         WITH SYNONYMS = ('revenue', 'earnings')
@@ -162,11 +163,11 @@ METRICS (
         AS avg(case when not reservation.is_censored
                 then reservation.nights end)
         WITH SYNONYMS = ('average stay', 'average nights', 'typical stay')
-        COMMENT = 'Mean nights per stay over COMPLETE reservations only - the 70 censored ones are excluded here by construction, because their length is truncated and would bias the mean down. 6.49 nights overall. Use this rather than averaging nights yourself.',
+        COMMENT = 'Mean nights per stay over COMPLETE reservations only - the censored ones are excluded here by construction, because their length is truncated and would bias the mean down. Use this rather than averaging nights yourself.',
 
     reservation.avg_length_of_stay_all
         AS avg(reservation.nights)
-        COMMENT = 'Mean nights per stay including censored reservations, which pulls it from 6.49 down to 6.43. Provided only so the difference is inspectable - prefer avg_length_of_stay.',
+        COMMENT = 'Mean nights per stay INCLUDING censored reservations, which pulls it below the complete-stay figure. Provided only so the difference is inspectable - prefer avg_length_of_stay.',
 
     reservation.median_length_of_stay
         AS median(case when not reservation.is_censored
@@ -180,10 +181,10 @@ METRICS (
 
     reservation.avg_booking_value AS avg(reservation.reservation_revenue)
         WITH SYNONYMS = ('average booking', 'revenue per booking')
-        COMMENT = 'Mean revenue per reservation. 1,076.59 dollars overall. Not filtered for censoring - the revenue on a truncated stay is real, only its length is unknown.',
+        COMMENT = 'Mean revenue per reservation. NOT filtered for censoring - the revenue on a truncated stay is real, only its length is unknown.',
 
     reservation.avg_nightly_rate AS avg(reservation.avg_nightly_price)
-        COMMENT = 'Mean of the per-reservation nightly rate. Reservation-weighted, so a one-night stay counts as much as a 90-night one - for a night-weighted rate use achieved_nightly_rate in sem_listing_daily.',
+        COMMENT = 'Mean of the per-reservation nightly rate. Reservation-weighted, so a one-night stay counts as much as a months-long one - for a night-weighted rate use achieved_nightly_rate in sem_listing_daily.',
 
     reservation.censored_reservations AS count_if(reservation.is_censored)
         COMMENT = 'How many reservations in the slice are truncated by a snapshot edge. Read this alongside any length-of-stay figure to see how much was excluded.',
@@ -193,15 +194,15 @@ METRICS (
         COMMENT = 'How many reservations start in one month and end in another - question 23.',
 
     reservation.listings AS count(distinct reservation.listing_id)
-        COMMENT = 'Distinct listings with at least one booking in the slice. 47 of the 50 listings were ever booked.',
+        COMMENT = 'Distinct listings with at least one booking in the slice. FEWER than the total listing count - a few listings were never booked at all.',
 
     reservation.hosts AS count(distinct reservation.host_id)
-        COMMENT = 'Distinct hosts with at least one booking. Excludes the orphan listing, whose host_id is NULL.'
+        COMMENT = 'Distinct hosts with at least one booking. Excludes orphan listings, whose host_id is NULL.'
 )
 
 COMMENT = 'Rental bookings: volume, length of stay, and booking value at one row per reservation. Use this for how many bookings, how long people stay, and what a booking is worth. For anything by specific date or month-over-month pricing use SEM_LISTING_DAILY. CANNOT ANSWER: cancellation rate, booking conversion, and booking lead time or pace - these reservations are derived from occupied calendar nights, so unconfirmed and cancelled bookings are invisible and no booking-created timestamp exists in the source. Repeat-guest questions are also impossible: reservation_id identifies a booking, not a guest, and there is no guest identity in the data.'
 
-AI_SQL_GENERATION 'Always use reservation_key as the reservation identifier, never reservation_id, which is not unique - id 836 covers two separate stays on different listings. For any question about how long people stay, use the avg_length_of_stay metric, which already excludes the 70 censored reservations; do not average the nights fact directly, because censored stays are truncated and bias it down. For counts and revenue do NOT filter is_censored, since those bookings really happened. The snapshot is a fixed year ending 2022-07-11 - never use current_date. Revenue is not prorated across months: a stay is attributed entirely to its check-in month.'
+AI_SQL_GENERATION 'Always use reservation_key as the reservation identifier, never reservation_id, which is NOT unique - the same id can cover separate stays on different listings. For any question about how long people stay, use the avg_length_of_stay metric, which already excludes the censored reservations; do not average the nights fact directly, because censored stays are truncated and bias it down. For counts and revenue do NOT filter is_censored, since those bookings really happened. The snapshot is a fixed one-year window, not a rolling one - never use current_date. Revenue is not prorated across months: a stay is attributed entirely to its check-in month.'
 
 {#
     Verified queries for the three questions this view answers. The entries live

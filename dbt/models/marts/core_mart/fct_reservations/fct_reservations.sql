@@ -23,7 +23,11 @@ with reservations as (
 
 listings as (
 
-    select * from {{ ref('stg_listings') }}
+    -- int_listings, which covers the orphans too. That makes the join below
+    -- find a row for every reservation — an orphan's attributes are still
+    -- NULL, since it has none anywhere, but they are NULL from a row that
+    -- exists rather than from a join that missed.
+    select * from {{ ref('int_listings') }}
 
 ),
 
@@ -36,8 +40,9 @@ amenities as (
     -- aggregate returns the same value.
     --
     -- Only the flags this mart exposes, for the same reason dim_listings names
-    -- its six: int_listing_daily generates all 81, and letting them through in
-    -- bulk would let a new amenity upstream change this mart's shape.
+    -- the ones it carries: int_listing_daily generates a flag per known
+    -- amenity, and letting them through in bulk would let a new amenity
+    -- upstream change this mart's shape.
     select
         listing_id,
         min(amenity_count) as amenity_count,
@@ -51,7 +56,7 @@ amenities as (
 
 select
     -- The primary key, not reservation_id — that column is not unique on its
-    -- own. Id 836 covers two separate one-night stays on different listings.
+    -- own, since the same id can cover separate stays on different listings.
     reservations.reservation_key,
     reservations.reservation_id,
     reservations.listing_id,
@@ -97,7 +102,9 @@ select
     reservations.is_orphan_listing
 
 from reservations
--- Left, not inner: listing 276450 has booked nights but no listings row, and an
--- inner join would drop its reservations and their revenue.
+-- Left, not inner. int_listings covers the orphans, so the two are equivalent
+-- today — but the reason for the left join has not changed: an orphan listing
+-- has booked nights and real revenue, and an inner join is the kind of thing
+-- that would drop them silently if the listing universe ever narrowed again.
 left join listings on reservations.listing_id = listings.listing_id
 left join amenities on reservations.listing_id = amenities.listing_id

@@ -32,14 +32,14 @@
     The short version: this used to flatten host_verifications on stg_listings, so
     a method appearing or disappearing in the source silently added or dropped an
     is_verified_* column on int_hosts. Dropping one is the dangerous direction —
-    dim_hosts names all 11 flags explicitly, so it would fail at run time on a
+    dim_hosts names every flag explicitly, so it would fail at run time on a
     column that vanished without a commit.
 
-    A SEED at 11 values, where int_host_verifications.yml previously argued the
-    inline list was fine at this size. That was true when the seed only fed a
-    test. It stopped being true once the seed also decides int_hosts' column list:
-    an accepted_values list in yml cannot be read by a Jinja loop, so keeping it
-    inline would mean two hand-maintained copies of the same 11 values, and the
+    A SEED even at this short a list, where int_host_verifications.yml previously
+    argued the inline list was fine at this size. That was true when the seed only
+    fed a test. It stopped being true once the seed also decides int_hosts' column
+    list: an accepted_values list in yml cannot be read by a Jinja loop, so keeping
+    it inline would mean two hand-maintained copies of the same values, and the
     failure mode of them disagreeing is a column with no test or a test with no
     column.
 
@@ -48,7 +48,7 @@
     at parse time `execute` is false and this returns before rendering it.
 
     Unlike amenities, EVERY method in the list is flagged, with no coverage floor.
-    `email` and `phone` are held by all 36 hosts and so carry no predictive
+    `email` and `phone` are held by every host and so carry no predictive
     signal, but a flag that is universally true is a tripwire: the day a host
     lands without a verified email, that flag goes false and is queryable.
     Dropping universal methods would mean losing the ability to notice.

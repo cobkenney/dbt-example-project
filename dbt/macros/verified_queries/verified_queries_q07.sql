@@ -16,8 +16,8 @@
     for concentration either gets refused or reaches for some adjacent metric -
     max_revenue, or an average - and reports it as the answer.
 
-    The orphan listing is LEFT IN. This is a revenue total, and its 76,520
-    dollars is real revenue; excluding it would understate the denominator and
+    The orphan listing is LEFT IN. This is a revenue total, and an orphan carries
+    real booked revenue; excluding it would understate the denominator and
     overstate every share. That is the opposite of the choice q04 makes, and the
     reason is that this question totals rather than compares attributes.
 

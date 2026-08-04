@@ -6,21 +6,22 @@
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    THIS QUESTION IS THE REASON as_of_date EXISTS. The snapshot ends 2022-07-11,
+    THIS QUESTION IS THE REASON as_of_date EXISTS. The snapshot is a fixed window,
     so recency measured against current_date drifts on every run and every answer
     silently ages. days_since_last_review and months_since_last_review are
     anchored to as_of_date instead, and pinning them here is what keeps a client
     from writing datediff against current_date. It was filed as needing a new
     model for exactly this reason; the anchored facts on the view are that work.
 
-    NEVER REVIEWED IS NOT STALE. last_review_date is NULL on the 3 listings that
+    NEVER REVIEWED IS NOT STALE. last_review_date is NULL on listings that
     have no reviews at all, so days_since_last_review is NULL for them too - not a
     large number. Sorting descending on it puts NULLs first unless told otherwise,
     which reads as the stalest listings in the portfolio. Every entry here uses
     `nulls last` and returns has_reviews, so the two states stay distinguishable.
 
     days_since_last_review is a FACT, so the banded entry is CTE-wrapped at
-    listing grain. It runs up to 108 months - 9 years - on the stalest listing.
+    listing grain. The range runs to several years on the stalest listing, so the
+    top band has to be open-ended.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

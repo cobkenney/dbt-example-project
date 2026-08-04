@@ -12,13 +12,13 @@
       here and only one answers "which host is doing well" - portfolio_revenue
       and avg_revenue_per_host scale with portfolio size by construction, so
       ranking on either returns the largest host rather than the best one.
-    - host_name_masked never appears without host_id. 36 hosts hold 35 distinct
-      names, so two share a hash and it is a grouping key rather than an
+    - host_name_masked never appears without host_id. Host names are not unique,
+      so distinct hosts can share a hash, and it is a grouping key rather than an
       identifier.
 
-    The portfolio total carries listings, which sums to 49 and not 50 - the
-    orphan listing has no host row. Pinning it here makes that the answer rather
-    than a discrepancy somebody finds later.
+    The portfolio total carries listings, which sums to FEWER than the total
+    listing count - orphan listings have no host row. Pinning it here makes that
+    the answer rather than a discrepancy somebody finds later.
 
     Top-N is an outer order by and limit around the closing paren. That is
     ordinary SQL, not a window function, so it needs no CTE.

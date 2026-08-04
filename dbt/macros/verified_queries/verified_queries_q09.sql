@@ -14,12 +14,13 @@
 
     The bands are fixed dollar boundaries rather than ntile buckets, so the
     answer is readable as a price range and does not shift when a listing is
-    added. list_price runs 25 to 571 dollars, so the top band is open-ended.
+    added. The top band is open-ended, so a listing above the highest boundary
+    still lands somewhere.
 
     The point of the question is that the highest-priced listing is rarely the
     highest-earning, so revenue and occupancy are returned together with the
-    listing count per band - 50 listings across 5 bands is thin, and the base
-    belongs next to the average.
+    listing count per band - the portfolio spread across five bands is thin, and
+    the base belongs next to the average.
 
     The scatter entry returns one row per listing instead, which is what somebody
     looking for a sweet spot actually needs: the shape, not five averages.

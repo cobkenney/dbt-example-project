@@ -7,6 +7,16 @@ Raw tables are landed from CSV as-is. All cleaning happens in staging, so that
 section is the single place to look when a downstream number disagrees with the
 source.
 
+> **Figures in this document are a snapshot, not a live claim.** Every row count,
+> revenue total, date range and listing id below was recorded on **2026-08-04**
+> against the `RENTALS` raw load current at that date, and is not re-derived on
+> build. They are a **regression baseline**: their value is that a rebuild
+> disagreeing with them is a signal worth chasing. Do not quote them as the
+> current state of the data — query the models for that. Comments inside the
+> models, and the `COMMENT` text on the semantic views, are deliberately
+> figure-free for the same reason: they describe what a column means, which is
+> durable, rather than what it currently holds, which is not.
+
 ## Layer map
 
 | Layer | Folder | Responsibility | Materialization |
@@ -125,6 +135,7 @@ No rows dropped, no casts needed — the raw types are already correct.
 | Model | Grain | Materialization | Rows |
 |---|---|---|---|
 | `int_amenities_current` | listing | table | 50 |
+| `int_listings` | listing | table | 50 |
 | `int_listing_daily` | listing × date | table | 18,250 |
 | `int_reservations` | listing × reservation | table | 1,565 |
 | `int_host_verifications` | host × verification method | table | 183 |
@@ -134,8 +145,9 @@ All tables, with no per-model exceptions — one rule for the layer.
 
 This departs from dbt's recommended `ephemeral` for intermediate models.
 Ephemeral inlines each model as a CTE in every consumer — nothing lands in the
-warehouse, but the logic re-runs per consumer. Both `int_amenities_current` and
-`int_listing_daily` have two consumers, so tables build that work once instead.
+warehouse, but the logic re-runs per consumer. `int_amenities_current`,
+`int_listing_daily` and `int_listings` all have multiple consumers, so tables
+build that work once instead.
 The cost of that choice is these models are queryable, which is why analysts are
 pointed at the marts layer rather than this one.
 
@@ -215,21 +227,83 @@ data doesn't currently require it: amenities are static across the whole period,
 and the latest state agrees with `stg_listings.amenities` for all 49 listings
 present in both.
 
+## int_listings
+
+One row per listing the project recognises — **50**, against the 49 in
+`stg_listings`. Descriptive attributes only: no measures, no raw JSON.
+
+### What it centralizes
+
+Four models read `stg_listings` directly before this existed, each taking its own
+column subset. That was defensible while nothing was shared. Two things were:
+
+**The grain.** `stg_listings` has 49 rows and the calendar references 50, so
+every consumer needing all of them rebuilt the universe itself — `dim_listings`
+drove off `select distinct listing_id` from the amenities bridge for exactly that
+reason. This model drives off the bridge once, here.
+
+**`is_orphan_listing`.** It was computed independently in `int_listing_daily` and
+again in `dim_listings`, both as `listings.listing_id is null` off their own left
+join. Two copies of the rule deciding which listings lack attributes, in two
+layers, with nothing tying them together. It is computed here and read
+downstream.
+
+### What it deliberately does not carry
+
+**The raw JSON columns.** `host_verifications` and `amenities` stay on
+`stg_listings`. Each has a dedicated flattening path, and carrying them here
+would offer a second route to the same array and invite the wrong one.
+`int_host_verifications` still refs `stg_listings`, correctly, because it needs
+the raw column.
+
+**Measures.** Revenue, occupancy and nightly rates are calendar-derived and live
+in `int_listing_daily`. Two homes for a listing-grain measure means no rule for
+choosing between them.
+
+`price` is renamed to `list_price`, the name the marts already used — the staging
+name is ambiguous next to the calendar's nightly `price`, which is a different
+measure.
+
+### The orphan row is the interesting one
+
+It has a `listing_id` and NULL for every descriptive column, including `host_id`.
+That is not a defect to filter out, it is the honest shape of the data, and
+`is_orphan_listing` is what lets each consumer decide. `int_hosts` filters it out
+with `where not is_orphan_listing` — with no `host_id` it cannot belong to a
+host, and grouping on NULL would invent a 37th. `fct_reservations` keeps it,
+because it carries real booked revenue.
+
+`tests/assert_orphan_listing_count.sql` pins the count at exactly one, at
+severity warn. Both directions matter: more than one means another listing has
+gone missing from the source, and **zero** means the grain has silently collapsed
+back to `stg_listings`' 49 — a regression that would otherwise build green and
+pass every other test on the model.
+
 ## int_listing_daily
 
 The daily grain the marts aggregate from: `stg_calendar` joined to listing
-attributes and amenity flags, one row per listing per date.
+attributes from `int_listings` and amenity flags, one row per listing per date.
 
 ### Left joins are load-bearing
 
-Listing 276450 appears in the calendar but not in `listings`. An inner join
-drops its 365 rows and **$2,200** of booked July-2022 revenue — enough to shift
-the no-AC revenue share from the correct **21.2%** to **22.1%**.
+Listing 276450 appears in the calendar but not in the raw `listings` table. An
+inner join against `stg_listings` drops its 365 rows and **$2,200** of booked
+July-2022 revenue — enough to shift the no-AC revenue share from the correct
+**21.2%** to **22.1%**.
 
-The `is_orphan_listing` flag makes that choice explicit downstream: marts can
-include or exclude those rows deliberately rather than inheriting a silent
-join-side effect. Row count is asserted equal to `stg_calendar` via
-`dbt_utils.equal_rowcount`, so a future inner join can't quietly drop rows.
+`int_listings` covers all 50 listings the calendar references, so the join finds
+a row for every calendar row and left versus inner no longer changes the result
+today. It stays a left join anyway: an inner join would answer the listing
+universe narrowing again by silently dropping calendar rows, where the left join
+leaves `is_orphan_listing` NULL and its `not_null` test says so.
+
+That test is meaningful only since the repoint. The column used to be computed in
+place as `listings.listing_id is null`, which returns true or false and never
+NULL, so a `not_null` test on it could not fail. Read across a join, it can.
+
+The flag itself makes the include-or-exclude choice explicit downstream: marts
+decide deliberately rather than inheriting a silent join-side effect. Row count is
+also asserted equal to `stg_calendar` via `dbt_utils.equal_rowcount`.
 
 ### revenue
 
@@ -353,10 +427,17 @@ One row per host. Hosts arrive denormalized onto the listings table rather than
 as their own source, so this reconstructs the grain by grouping on `host_id`:
 **36 hosts across 49 listings** — 29 with one listing, 7 with several, up to 5.
 
-Sourced from `stg_listings` and `int_listing_daily` rather than `dim_listings`,
-to keep the intermediate layer free of mart dependencies. That means orphan
-listing 276450 is absent, which is correct — with no listings row it has no
-`host_id` and cannot belong to any host.
+Sourced from `int_listings` and `int_listing_daily` rather than `dim_listings`,
+to keep the intermediate layer free of mart dependencies. Orphan listing 276450
+is excluded with `where not is_orphan_listing`, which is correct — with no
+listings row it has no `host_id` and cannot belong to any host.
+
+That exclusion is a stated filter rather than a side effect. Reading
+`stg_listings`, the orphan was absent because that model does not have it: the
+right outcome for a reason unrelated to hosts, and invisible in this model.
+`int_listings` carries all 50, so the filter has to be written down — and if it
+were ever dropped, the `not_null` test on `host_id` fails rather than a 37th host
+appearing.
 
 ### Host attributes are picked with min(), and that premise is tested
 
@@ -422,10 +503,16 @@ cost once is the right trade.
 
 ## dim_listings
 
-Built from `int_amenities_current`, not `stg_listings`. That choice sets the
-grain to all 50 listings the calendar actually references, including orphan
-276450 which never appears in `listings`. Its descriptive columns land NULL and
+Built from `int_listings`, not `stg_listings`. That is where the grain comes
+from: all 50 listings the calendar actually references, including orphan 276450
+which never appears in `listings`. Its descriptive columns land NULL and
 `is_orphan_listing` flags it, rather than the listing vanishing.
+
+This model used to establish that grain itself — `select distinct listing_id` off
+the amenities bridge, left joined to `stg_listings` for the attributes, with
+`is_orphan_listing` derived from whether that join found anything. `int_listings`
+holds all three, so this model no longer decides which listings exist or which
+ones lack attributes; it reads both and joins the daily rollup.
 
 `total_revenue` uses `coalesce(sum(revenue), 0)`. Three listings (1454258,
 1510876, 743759) are available all 365 days and never booked, so `sum()` over
@@ -603,9 +690,8 @@ anything.
 
 ### Verification does not predict performance
 
-[../analyses/07_host_verification_adoption.sql](../analyses/07_host_verification_adoption.sql)
-records the negative result rather than leaving the intuition standing. With 36
-hosts and 11 methods there are more cells than hosts, and the spread is
+This records the negative result rather than leaving the intuition standing. With
+36 hosts and 11 methods there are more cells than hosts, and the spread is
 non-monotonic: `facebook` — a social link, not an identity check — shows the
 second-highest occupancy, while the stronger `selfie` check sits below average,
 and `kba` has the highest review score alongside the lowest occupancy. `email` and
@@ -683,8 +769,8 @@ Listing 276450 has 365 calendar rows and 2 amenity-changelog rows but no row in
 | Layer | Handling |
 |---|---|
 | Staging | Orphan rows **kept**, not filtered. `relationships` tests set to `severity: warn`. |
-| Intermediate | Joins are **left** joins; `is_orphan_listing` carries the flag forward. `int_amenities_current` is sourced from the changelog so the orphan still gets amenity flags. |
-| Marts | `dim_listings` is driven off `int_amenities_current`, so the orphan is one of the 50 rows. Descriptive columns land NULL. |
+| Intermediate | `int_listings` sets the 50-listing grain and computes `is_orphan_listing` once; downstream models read it rather than each deriving it. Joins stay **left** joins. `int_amenities_current` is sourced from the changelog so the orphan still gets amenity flags. `int_hosts` excludes it explicitly — no `host_id`, so no host. |
+| Marts | `dim_listings` and `fct_reservations` are built off `int_listings`, so the orphan is present in both. Descriptive columns land NULL; its revenue is real and is counted. |
 
 Dropping a year of availability data silently is worse than surfacing it, which
 is why nothing filters it out and consumers choose explicitly.
@@ -703,8 +789,8 @@ what arrived; model tests guarantee what staging produced. A red build then
 always means a bug in our code, never a known upstream defect — while the
 upstream defects stay visible instead of being silently swallowed.
 
-Six tests warn rather than error. All six reflect real defects in the raw data
-that staging does not fully repair:
+Six tests warn **and currently fire**. All six reflect real defects in the raw
+data that staging does not fully repair:
 
 | Test | Rows | Why warn |
 |---|---|---|
@@ -717,6 +803,21 @@ that staging does not fully repair:
 
 If listing 276450 is ever backfilled, all four relationships warnings clear on
 their own and can be promoted to `error`.
+
+Three more tests are set to warn but pass today. They are **tripwires**, not
+defect records — each one describes a source change that is nobody's bug but that
+somebody has to act on, which is why blocking the build would be the wrong
+response:
+
+| Test | On | Fires when |
+|---|---|---|
+| `warn_new_amenity_name` | `int_listing_amenities` | the source grows an amenity the seed does not list |
+| `warn_new_verification_method` | `int_host_verifications` | the source grows a verification method the seed does not list |
+| `assert_orphan_listing_count` | `int_listings` | the orphan count leaves exactly one — in **either** direction |
+
+The third is also a regression guard, and that is the direction worth naming: at
+zero it means the listing grain has collapsed back to `stg_listings`' 49, which
+is our bug and not the source's.
 
 Each model has a paired `.yml` in its own subfolder. Beyond the per-layer tests
 described above, the marts assert:
@@ -734,19 +835,26 @@ described above, the marts assert:
 
 # Business questions
 
-[../analyses/](../analyses/) holds one query per business problem. They compile
-with `dbt compile` but are not built as models — they demonstrate how an analyst
-uses these marts. Each result was also verified against the intermediate models.
+The questions live as verified queries on the semantic views, one macro per
+question in
+[../macros/verified_queries/](../macros/verified_queries/). Each macro's header
+records why its query is shaped the way it is and what the plausible wrong answer
+would be; the query itself is the executable form. See
+[core_context_layer/README.md](marts/core_context_layer/README.md) for how they
+are wired and which view carries which question.
 
-| Question | Analysis | Mart used | Verified result |
-|---|---|---|---|
-| Amenity revenue by month | `01_amenity_revenue.sql` | `fct_listing_daily` | July 2022 → 21.2% of revenue from listings without AC |
-| Neighborhood price increase | `02_neighborhood_pricing.sql` | `fct_listing_daily` | Back Bay → 1 listing, $44.00 average increase ($106 → $150) |
-| Longest stay, lockbox + first aid kit | `03_long_stay_picky_renter.sql` | `fct_listing_daily` + `dim_listings` | listing 1303261 → 159 nights. Derives availability windows in the query — see [Collapsed models](#collapsed-models) |
-| Reservation volume and length of stay | `04_reservation_summary.sql` | `fct_reservations` | 1,565 reservations, 6.49-night average stay, $1,076.59 average booking value |
-| Multi-listing vs single-listing hosts | `05_host_portfolio_performance.sql` | `dim_hosts` | Multi-listing hosts earn $19,267 per listing vs $39,749 — see [dim_hosts](#dim_hosts) |
-| Price per bedroom and per bed | `06_price_per_bedroom.sql` | `fct_listing_daily` | Entire homes $165.68/bedroom and $128.10/bed vs $85.74 and $84.15 for private rooms |
-| Host verification adoption | `07_host_verification_adoption.sql` | `int_host_verifications`, `dim_hosts` | email/phone 36 of 36, reviews 34, kba 18, government_id 16 — and **no** relationship to occupancy or revenue, see [dim_hosts](#dim_hosts) |
+Results below were verified against the intermediate models at the date in the
+header above.
+
+| Question | Mart used | Verified result |
+|---|---|---|
+| Amenity revenue by month | `fct_listing_daily` | July 2022 → 21.2% of revenue from listings without AC |
+| Neighborhood price increase | `fct_listing_daily` | Back Bay → 1 listing, $44.00 average increase ($106 → $150) |
+| Longest stay, lockbox + first aid kit | `fct_listing_daily` + `dim_listings` | listing 1303261 → 159 nights. Groups on `availability_window_seq` — see [Collapsed models](#collapsed-models) |
+| Reservation volume and length of stay | `fct_reservations` | 1,565 reservations, 6.49-night average stay, $1,076.59 average booking value |
+| Multi-listing vs single-listing hosts | `dim_hosts` | Multi-listing hosts earn $19,267 per listing vs $39,749 — see [dim_hosts](#dim_hosts) |
+| Price per bedroom and per bed | `fct_listing_daily` | Entire homes $165.68/bedroom and $128.10/bed vs $85.74 and $84.15 for private rooms |
+| Host verification adoption | `int_host_verifications`, `dim_hosts` | email/phone 36 of 36, reviews 34, kba 18, government_id 16 — and **no** relationship to occupancy or revenue, see [dim_hosts](#dim_hosts) |
 
 2 listings carry both a lockbox and a first aid kit; 42 of 50 have air
 conditioning.

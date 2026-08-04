@@ -9,16 +9,18 @@
     The plainest question this view answers, and the one most likely to be asked
     first, so it gets several phrasings rather than several queries.
 
-    THE MONTH IS NOT A SEASON. The window runs 2021-07-12 to 2022-07-11, so July
-    appears TWICE and both halves are partial - 20 days in 2021 and 11 in 2022.
-    Grouping by month name to get "seasonality" therefore double-counts a partial
-    July against itself. month_start_date keeps the two apart, and calendar_nights
+    THE MONTH IS NOT A SEASON. The window is a fixed year that does not start on
+    a month boundary, so its first and last calendar month are the SAME month of
+    the year and both halves are partial.
+    Grouping by month name to get "seasonality" therefore double-counts that
+    partial month against itself. month_start_date keeps the two apart, and
+    calendar_nights
     is returned next to revenue so a short month is visible as a short month
     rather than read as a downturn. occupancy_rate and achieved_nightly_rate are
     the two figures that are actually comparable across months, since both are
     per-night.
 
-    No orphan filter: this is a revenue total, and listing 276450 carries real
+    No orphan filter: this is a revenue total, and an orphan carries real
     booked revenue. Nothing here groups on a listing attribute, so its NULLs
     never form a group.
 

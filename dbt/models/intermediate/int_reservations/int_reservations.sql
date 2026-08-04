@@ -42,10 +42,9 @@ reservations as (
     select
         -- Surrogate key over the real grain, following the same pattern as
         -- calendar_id. Needed because reservation_id is NOT unique on its own:
-        -- id 836 covers two separate one-night stays on listings 753446 and
-        -- 801680, both on 2021-07-12.
-        -- Grouping on reservation_id alone would have merged them into one
-        -- impossible 2-night reservation spanning two properties.
+        -- the same id can appear on two different listings, covering two
+        -- separate stays. Grouping on reservation_id alone would have merged
+        -- them into one impossible reservation spanning two properties.
         {{ dbt_utils.generate_surrogate_key([
             'listing_id', 'reservation_id'
         ]) }} as reservation_key,

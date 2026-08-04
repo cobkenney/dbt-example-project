@@ -6,13 +6,10 @@
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    Verified in analyses/01_amenity_revenue.sql: July 2022 shows 21.2 percent of
-    revenue from listings without AC.
-
-    THE ORPHAN LISTING IS DELIBERATELY LEFT IN. This is a revenue total, and
-    listing 276450 carries $2,200 of real booked July 2022 revenue. It does have
-    air conditioning, so filtering it out strips revenue from the AC segment and
-    pushes the no-AC share to 22.1 percent - a different answer to the question
+    THE ORPHAN LISTING IS DELIBERATELY LEFT IN. This is a revenue total, and an
+    orphan carries real booked revenue. The orphan here also has air
+    conditioning, so filtering it out strips revenue from the AC segment and
+    pushes the no-AC share up - a different answer to the question
     asked, from a filter that looks like hygiene. The comparison here is on an
     amenity flag carried by the daily fact, not on a listing attribute, so the
     NULL-descriptive-columns reason for excluding it does not apply.

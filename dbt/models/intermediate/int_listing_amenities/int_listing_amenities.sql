@@ -8,22 +8,22 @@
 -- is_verified_* pivot to int_hosts.
 --
 -- The reduction to the CURRENT amenity set is still here, and it is still a
--- reduction rather than history. The changelog does hold real history (2 events
--- per listing, 48 of 50 with differing amenity sets), but every event predates
+-- reduction rather than history. The changelog does hold real history — most
+-- listings have events with differing amenity sets — but every event predates
 -- the calendar window, so a point-in-time join provably changes nothing — see
 -- tests/assert_amenities_predate_calendar.sql, which fails if that stops being
 -- true. If it ever fails, this model becomes SCD2 and the pivot downstream has
 -- to join on a date range rather than on listing_id alone.
 --
--- Built from the changelog rather than stg_listings so that listing 276450 —
--- present in the calendar but absent from listings — still gets amenities.
+-- Built from the changelog rather than stg_listings so that orphan listings —
+-- present in the calendar but absent from listings — still get amenities.
 with latest_amenities as (
 
     select
         listing_id,
         amenities
-    -- The changelog, not stg_listings: it covers all 50 listings the calendar
-    -- references, including 276450, which listings is missing.
+    -- The changelog, not stg_listings: it covers every listing the calendar
+    -- references, including the orphans that listings is missing.
     from {{ ref('stg_amenities_changelog') }}
     qualify
         row_number() over (

@@ -6,11 +6,12 @@ models:
       Snowflake semantic view over `fct_reservations`: booking volume, length of
       stay, and booking value at one row per reservation.
 
-      Separate from `sem_listing_daily` because the grains differ — 1,565
-      reservations against 17,885 calendar rows — and a single view holding both
-      would let a booking be counted once per night it occupies.
+      Separate from `sem_listing_daily` because the grains differ — one row per
+      reservation here against one row per listing-night there — and a single
+      view holding both would let a booking be counted once per night it
+      occupies.
 
-      The `avg_length_of_stay` metric excludes the 70 censored reservations by
+      The `avg_length_of_stay` metric excludes the censored reservations by
       construction, which is the one thing most likely to be got wrong by hand.
 
       Descriptions here do not reach Snowflake; the `COMMENT` clauses in the DDL

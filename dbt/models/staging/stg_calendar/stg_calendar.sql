@@ -1,5 +1,5 @@
 -- One row per listing per date. Deduped because the raw table
--- can have duplicates
+-- can have duplicates at that grain.
 with deduplicated as (
 
     {{ dbt_utils.deduplicate(

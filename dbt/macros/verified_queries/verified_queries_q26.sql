@@ -14,20 +14,20 @@
     fct_listing_daily, so the run is a GROUP BY rather than a window function.
     See verified_queries_q03 for the three rules the column does not encode.
 
-    Verified against the marts: 204 availability windows, of which 59 are
-    unbookable, covering 300 nights and $64,062 of asking price - 4.5 percent of
-    the $1,430,664 in open inventory.
+    Verified against the marts. The portfolio entry returns the counts and the
+    share, so the size of the loss is read off the query rather than restated
+    here.
 
-    max_minimum_nights, not avg_minimum_nights. minimum_nights VARIES inside 7 of
-    the 204 windows, and a stay covering the run has to clear the requirement on
-    every night of it, so the strictest night is the binding one. Taking the mean
-    instead calls 58 windows unbookable rather than 59.
+    max_minimum_nights, not avg_minimum_nights. minimum_nights VARIES inside some
+    windows, and a stay covering the run has to clear the requirement on every
+    night of it, so the strictest night is the binding one. Taking the mean instead
+    UNDERCOUNTS the unbookable windows.
 
     The lost value is the sum of the nightly PRICES asked on those nights, not
     revenue - revenue is NULL on an available night by construction, so summing
     it here returns nothing. It is an upper bound on the opportunity: it assumes
     every one of those nights would otherwise have sold at its asking rate, which
-    at 60 percent portfolio occupancy it would not.
+    at the portfolio occupancy rate it would not.
 
     That sum is reconstructed as calendar_nights * avg_nightly_price, because the
     view exposes no sum-of-price metric - deliberately, since a total of asking

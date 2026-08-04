@@ -129,9 +129,9 @@ models:
 
       - name: calendar_days
         description: >
-          Days the listing appears in the calendar. 365 for every listing, since
-          the source is a fixed one-year snapshot — so it is the denominator of
-          `occupancy_rate` rather than a measure of listing age.
+          Days the listing appears in the calendar. Identical across listings,
+          since the source is a fixed one-year snapshot — so it is the
+          denominator of `occupancy_rate` rather than a measure of listing age.
 
       - name: booked_nights
         description: Nights booked across the calendar window.

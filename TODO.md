@@ -30,6 +30,13 @@
       - snowflake schemas
     - stg, int, marts, sv
       - include decisions made when building
+        - no amenities history needed bc history predates calendar, not very meaningful on its own
+        - hard deletes
+        - pii
+        - null ids
+        - bath outliers
+        - reservation id vs reservation key
+        - calendar limitations
     - necessary packages (utils, snowflake semantic view)
     - standalone tests
     - test warn vs fail
@@ -42,3 +49,4 @@
   - monitor noise of skills
   - set up monitoring on tables (tools like Monte Carlo), might be built in, might need to distinguish between layers what is necessary
   - similarity assessment of metrics
+  - extend wake up ae to semantic view additions

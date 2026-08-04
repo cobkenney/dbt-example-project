@@ -9,12 +9,12 @@
     The SQL is written against the view's own metrics, in the explicit
     SEMANTIC_VIEW(...) form — a metric cannot be selected from the view by
     name. Whichever entry a client picks, avg_length_of_stay already excludes
-    the 70 censored reservations, which is the whole point of pinning this
-    question: averaging the nights fact directly is the plausible wrong answer.
+    the censored reservations, which is the whole point of pinning this
+    question: averaging the nights fact directly is the plausible wrong answer,
+    and it reads LOW, since a censored stay is recorded shorter than it was.
 
-    Verified figures: 1,565 reservations, 10,059 booked nights, 6.49 nights
-    average stay (6.43 including censored), $1,076.59 average booking value,
-    70 censored.
+    The censoring entry returns both averages side by side so the size of that
+    bias is inspectable rather than asserted here.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

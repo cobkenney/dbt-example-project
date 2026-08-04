@@ -1,5 +1,15 @@
 # core_context_layer
 
+> **Figures in this document are a snapshot, not a live claim.** Every number
+> below — the revenue reconciliation, the occupancy percentages, the verified
+> figures, the reference values — was recorded on **2026-08-04** against the
+> `RENTALS` raw load current at that date, and is not re-derived on build. They
+> are a **regression baseline**: their value is that a rebuild disagreeing with
+> them is a signal worth chasing. Do not quote them as the current state of the
+> data — query the views for that. The `COMMENT` and `AI_SQL_GENERATION` text
+> inside the views themselves is deliberately figure-free for the same reason,
+> since a client reads those and would quote them as fact.
+
 Snowflake semantic views over `core_mart`. This is the layer a natural-language
 client — Cortex Analyst, or anything else that turns English into SQL — reads to
 learn what the tables mean.
@@ -51,7 +61,7 @@ fourth view looks like duplication. It is not, because the two weightings give
 different numbers and both are legitimate:
 
 - **host-weighted** — every host counts once, whatever the portfolio size. This
-  view. It is what `analyses/05` reports.
+  view, and the weighting the multi-listing finding rests on.
 - **listing-weighted** — every listing counts once, so a 5-listing host pulls the
   average five times as hard. That is `sem_listing_performance`.
 
@@ -123,8 +133,8 @@ run` fails outright on a malformed clause, which is stricter than the linter was
 
 - **Window functions.** So questions 3 and 26 (gap-and-island over availability
   runs) cannot be a plain `SEMANTIC_VIEW(...)` query. They work wrapped in a CTE,
-  which is allowed — verified reproducing `analyses/03` exactly: listing 1303261 →
-  159 nights, 182613 → 112.
+  which is allowed — verified reproducing the mart figures exactly: listing
+  1303261 → 159 nights, 182613 → 112.
 
   **This limitation moved a column upstream.** The gap-and-island now lives on
   `fct_listing_daily` as `availability_window_seq`, so `sem_listing_daily` exposes
@@ -144,24 +154,24 @@ run` fails outright on a malformed clause, which is stricter than the linter was
 - **A metric and a fact sharing a name.** They share one namespace, so the host
   view's roll-ups are prefixed `portfolio_*` where they would otherwise collide.
 
-## Verified against `analyses/`
+## Verified against the marts
 
-Every figure below was reproduced through the semantic views and matches the
-existing verified analysis exactly.
+Every figure below was reproduced through the semantic views and matches what the
+same question returns against `core_mart` directly.
 
-| Question | Figure | Source |
-|---|---|---|
-| 1 — revenue without AC | 21.2% of July 2022 revenue | `analyses/01` |
-| 3 — longest picky-renter stay | 1303261 → 159 nights; 182613 → 112 | `analyses/03` |
-| 17 — reservation summary | 1,565 bookings, 10,059 nights, 6.49 vs 6.43 nights, $1,076.59 | `analyses/04` |
-| 19 — multi vs single-listing hosts | $19,267 / 38.5% / 6.25 vs $39,749 / 60.0% / 6.11 | `analyses/05` |
-| 22 — price per bedroom and bed | entire home $216.84 / $165.68 / $128.10; private room $89.11 / $85.74 / $84.15 | `analyses/06` |
+| Question | Figure |
+|---|---|
+| 1 — revenue without AC | 21.2% of July 2022 revenue |
+| 3 — longest picky-renter stay | 1303261 → 159 nights; 182613 → 112 |
+| 17 — reservation summary | 1,565 bookings, 10,059 nights, 6.49 vs 6.43 nights, $1,076.59 |
+| 19 — multi vs single-listing hosts | $19,267 / 38.5% / 6.25 vs $39,749 / 60.0% / 6.11 |
+| 22 — price per bedroom and bed | entire home $216.84 / $165.68 / $128.10; private room $89.11 / $85.74 / $84.15 |
 
 ## `AI_VERIFIED_QUERIES`
 
 A question-and-SQL pair per business question: what teaches Cortex Analyst the
-shape of a correct answer, and what pins each metric to a figure already verified
-in `analyses/`. All four views carry them.
+shape of a correct answer, and what pins each metric to a query whose result has
+been checked against the marts. All four views carry them.
 
 | View | Questions | Entries |
 |---|---|---|
@@ -204,8 +214,8 @@ written:
   logical tables and columns defined in the semantic model, not those in the
   underlying dataset." A verified query exists to teach a client which metric
   answers which question, and base-table SQL teaches it nothing about choosing
-  `avg_length_of_stay` over `avg_length_of_stay_all`. So `analyses/` are the
-  source of the verified *figures* here, not of the query text.
+  `avg_length_of_stay` over `avg_length_of_stay_all`. So the marts are what the
+  *figures* were verified against, not what the query text is written against.
 - **Snowflake does not validate the SQL when the view is created.** A verified
   query selecting a nonexistent column from a nonexistent table was accepted and
   the `CREATE` succeeded. A query that has silently rotted still builds green and

@@ -5,8 +5,8 @@ models:
     description: >
       One row per listing per date, joining calendar to listing attributes and
       amenity flags. The daily grain every mart aggregates from. Left joins
-      preserve the 365 orphan rows for listing 276450, which carry $2,200 of
-      booked revenue that an inner join would silently drop.
+      preserve the orphan listings' calendar rows, which carry real booked
+      revenue that an inner join would silently drop.
     config:
       tags: ['1x_day']
     columns:
@@ -70,11 +70,20 @@ models:
                 min_value: 0
                 inclusive: true
 
-      # No not_null on is_orphan_listing, here or in any model that carries it
-      # forward. It is defined as `listings.listing_id is null` — an IS NULL
-      # comparison always returns true or false, never NULL.
+      # not_null is meaningful here now, which it was not before. This column
+      # used to be computed in place as `listings.listing_id is null` — an IS
+      # NULL comparison returns true or false and never NULL, so the test could
+      # not fail. It is now read across a left join to int_listings, so a NULL
+      # means a calendar row whose listing is absent from int_listings: the
+      # calendar has grown a listing the amenities bridge does not cover, and
+      # the model has quietly stopped knowing whether it is an orphan.
+      #
+      # Models downstream carry the column forward without a join, so they need
+      # no test of their own — this is the one place it can go NULL.
       - name: is_orphan_listing
         description: "{{ doc('is_orphan_listing') }}"
+        data_tests:
+          - not_null
 
       - name: listing_name
         description: "{{ doc('listing_name') }}"
@@ -105,7 +114,7 @@ models:
           {{ doc('amenity_count') }}
 
           not_null is the tripwire for the amenities left join missing a listing:
-          the bridge covers all 50 listings the calendar references today, and a
+          the bridge covers every listing the calendar references today, and a
           NULL here means one stopped appearing in the changelog. That is also
           what would silently turn every flag below NULL.
         data_tests:
@@ -118,8 +127,8 @@ models:
           amenity names without a schema change, which the generated columns do
           not.
 
-      # The 81 generated flags. The loop that builds them lives in this model's
-      # .sql; this list is maintained by
+      # The generated amenity flags. The loop that builds them lives in this
+      # model's .sql; this list is maintained by
       #
       #   dbt run-operation generate_amenity_flag_yml
       #

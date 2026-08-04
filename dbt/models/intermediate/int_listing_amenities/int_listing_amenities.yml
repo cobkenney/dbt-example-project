@@ -4,26 +4,26 @@ models:
   - name: int_listing_amenities
     description: >
       One row per listing per amenity — the bridge grain, flattened out of the
-      JSON array on the changelog's latest event per listing. 50 listings, 81
-      distinct amenities.
+      JSON array on the changelog's latest event per listing. The amenity
+      vocabulary is enumerated in seeds/known_amenity_names.csv.
 
 
       Just the flatten: the boolean pivot lives in int_listing_daily, where the
       flags are consumed. Same split as int_host_verifications, which flattens
       verifications and leaves the is_verified_* pivot to int_hosts. That is what
-      keeps the generated 81-column surface out of this model and out of anything
-      that only needs to know which amenities a listing has.
+      keeps the generated one-column-per-amenity surface out of this model and
+      out of anything that only needs to know which amenities a listing has.
 
 
       Holds the CURRENT amenity set, a deliberate grain reduction rather than
-      history. The changelog does hold real history (2 events per listing, 48 of
-      50 with differing amenity sets), but every event predates the calendar
+      history. The changelog does hold real history — most listings have events
+      with differing amenity sets — but every event predates the calendar
       window, so a point-in-time join provably changes nothing — see
       tests/assert_amenities_predate_calendar.sql, which fails if that stops
       being true.
 
 
-      Covers all 50 listings the calendar references, including 276450, which
+      Covers every listing the calendar references, including the orphans
       stg_listings lacks — the changelog is the driving table for exactly that
       reason.
     config:
@@ -47,8 +47,9 @@ models:
           - not_null
 
           # Warns when the source produces an amenity this project has not seen.
-          # The known list is a SEED, seeds/known_amenity_names.csv, rather than 81
-          # literal values inline — see seeds/_seeds.yml for why, and for the cost.
+          # The known list is a SEED, seeds/known_amenity_names.csv, rather than a
+          # wall of literal values inline — see seeds/_seeds.yml for why, and for
+          # the cost.
           #
           # relationships, not accepted_values, because accepted_values takes a
           # literal list and cannot read a table. Same semantics here: every
@@ -57,7 +58,7 @@ models:
           #
           # WARN, not error. A new amenity upstream is a source change, not a
           # defect, so failing the build over it would be wrong — but saying
-          # nothing would mean int_listing_daily silently grows an 82nd flag column
+          # nothing would mean int_listing_daily silently grows another flag column
           # that no yml documents and no mart carries.
           #
           # The warning is a WORK ORDER, not a defect report:
@@ -87,7 +88,8 @@ models:
     # SQL rather than asserted after the fact. Same reasoning as
     # int_host_verifications.
     #
-    # No rowcount test against stg_amenities_changelog — this is a bridge, so
-    # ~1,800 rows against 50 listings. The condition worth watching is a listing
-    # reaching zero rows here, which would silently drop its flags to NULL
-    # downstream; int_listing_daily.amenity_count's not_null catches that.
+    # No rowcount test against stg_amenities_changelog — this is a bridge, so the
+    # rowcount is a multiple of the listing count and not a fixed figure. The
+    # condition worth watching is a listing reaching zero rows here, which would
+    # silently drop its flags to NULL downstream;
+    # int_listing_daily.amenity_count's not_null catches that.

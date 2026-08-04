@@ -12,8 +12,8 @@
     exists partly to record that the question is answerable, since the doc listed
     it under "need a new model" before this view existed.
 
-    THE BASE IS THE FINDING HERE. Some neighborhoods hold a single listing - Back
-    Bay is one - so a per-neighborhood achieved rate can rest on one property.
+    THE BASE IS THE FINDING HERE. Some neighborhoods hold a single listing, so a
+    per-neighborhood achieved rate can rest on one property.
     listings is first in the select list on every entry for that reason: a density
     comparison that hides its denominator is the failure mode of this question,
     not a detail.

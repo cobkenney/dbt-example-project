@@ -7,25 +7,25 @@
     natural-language client matches an asked question against.
 
     distinct_prices is the whole answer, and it is a count of distinct RATES, not
-    a count of CHANGES. A listing that alternates $100 and $150 all year reports
-    2, the same as one that moved once and stayed. The gap between the two
+    a count of CHANGES. A listing that alternates between two rates all year
+    reports 2, the same as one that moved once and stayed. The gap between the two
     readings needs lag over calendar_date, which no semantic view can express -
     so this measures price VARIETY and the phrasings are written to promise that
     rather than a change frequency. distinct_prices = 1 is the unambiguous end:
     the rate never moved at all.
 
     min and max nightly price ride along to give the variety a size. Ten distinct
-    rates spanning $5 is noise; ten spanning $300 is a pricing strategy, and the
-    count alone cannot tell them apart.
+    rates within a few dollars of each other is noise; ten spanning hundreds is a
+    pricing strategy, and the count alone cannot tell them apart.
 
     The banding entry sorts hosts into set-and-forget against dynamic, which is
     what the question is for. Bands are on the distinct-rate count, which is a
     METRIC here rather than a fact - so the CTE wrap is to band an aggregate,
     not to dodge the facts-with-metrics restriction.
 
-    is_orphan_listing is not filtered from the per-listing entries: it has a
-    price series like any other listing and the grouping key is listing_id, so
-    its NULL attributes never surface. The room-type cross does filter it.
+    is_orphan_listing is not filtered from the per-listing entries: an orphan has
+    a price series like any other listing and the grouping key is listing_id, so
+    its NULL attributes never surface. The room-type cross does filter them.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

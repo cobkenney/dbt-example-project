@@ -4,7 +4,7 @@ models:
   - name: stg_calendar
     description: >
       One row per listing per date. Deduplicated on (listing_id, calendar_date)
-      to fix a triplicated source row.
+      because the source lands duplicate rows at that grain.
     config:
       tags: ['1x_day']
     columns:
@@ -18,15 +18,16 @@ models:
           # grain — the key is the hash of exactly that pair — so there is no
           # separate unique_combination_of_columns test on this model. It is the
           # error-severity counterpart to the warn-severity grain test on the
-          # source, which documents the triplicated row this model deduplicates.
+          # source, which surfaces the duplicates this model collapses.
           - unique
 
       - name: listing_id
         description: >
           {{ doc('listing_id') }}
 
-          References stg_listings.listing_id. 365 rows reference listing 276450,
-          which is absent from listings — warns rather than errors.
+          References stg_listings.listing_id, but some rows reference a listing
+          absent from it — warns rather than errors so those rows survive into
+          int_listings, which flags them as orphans.
         data_tests:
           - not_null
           - relationships:

@@ -51,7 +51,8 @@ renamed as (
 
     from source
 
-    -- 2 rows land with a NULL id and cannot be joined to anything downstream.
+    -- Some source rows land with a NULL id and cannot be joined to anything
+    -- downstream. The source's not_null warn test is what surfaces them.
     where id is not null
 
 )

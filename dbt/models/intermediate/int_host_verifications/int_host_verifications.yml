@@ -4,24 +4,25 @@ models:
   - name: int_host_verifications
     description: >
       One row per host per verification method — the bridge grain, flattened out
-      of the raw JSON array on stg_listings. 11 distinct methods across 36 hosts.
-      Materialized as a table like every other intermediate model.
+      of the raw JSON array on stg_listings. The method vocabulary is enumerated
+      in seeds/known_verification_methods.csv. Materialized as a table like every
+      other intermediate model.
 
 
       Kept alongside the generated is_verified_* flags on int_hosts because the
       two shapes answer different questions. The flags answer "which hosts have
       X" inside a filter; this answers "how many hosts hold each method" without
-      naming 11 columns, and it does not change shape when the source adds a
-      method.
+      naming a column per method, and it does not change shape when the source
+      adds one.
 
 
       Grouped to the host grain BEFORE flattening. Verifications are a host
       attribute denormalized onto every listing row, so flattening stg_listings
-      directly would emit a row per listing per method and overcount the 7
-      multi-listing hosts.
+      directly would emit a row per listing per method and overcount every
+      multi-listing host.
 
 
-      Excludes orphan listing 276450, which has no listings row and therefore no
+      Excludes orphan listings, which have no listings row and therefore no
       host_id or verification array.
     config:
       tags: ['1x_day']
@@ -44,12 +45,12 @@ models:
         data_tests:
           - not_null
 
-          # The 11 methods pinned in seeds/known_verification_methods.csv, at WARN
+          # The methods pinned in seeds/known_verification_methods.csv, at WARN
           # rather than error. A new method upstream is a source change, not a
           # defect — so failing the build on it would be wrong, and saying nothing
           # would mean nobody ever learns the source grew one.
           #
-          # A RELATIONSHIPS test against the seed, not accepted_values with the 11
+          # A RELATIONSHIPS test against the seed, not accepted_values with the
           # values inline, which is where this started. The seed is what int_hosts
           # loops over to generate its is_verified_* columns, and an
           # accepted_values list in yml cannot be read by a Jinja loop — so
@@ -89,7 +90,7 @@ models:
       # statement is `select distinct host_id, verification_method`, so the grain
       # is enforced by the SQL rather than asserted after the fact.
       #
-      # No rowcount test against int_hosts — this is a bridge, so 183 rows
-      # against 36 hosts. The condition worth watching is a host reaching zero
-      # rows here, and int_hosts.verification_count going NULL is what catches
-      # that.
+      # No rowcount test against int_hosts — this is a bridge, so the rowcount is
+      # a multiple of the host count and not a fixed figure. The condition worth
+      # watching is a host reaching zero rows here, and
+      # int_hosts.verification_count going NULL is what catches that.

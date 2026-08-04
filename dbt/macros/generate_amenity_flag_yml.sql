@@ -16,7 +16,7 @@
     Uses print() rather than log() so the output has no timestamp prefix and can
     be pasted directly.
 
-    Pass --args '{all: true}' to re-emit all 81 flags instead of only the
+    Pass --args '{all: true}' to re-emit every flag instead of only the
     missing ones. Flags already declared keep their {{ doc(...) }} reference so
     the curated descriptions in docs.md are never replaced by generated prose.
 #}

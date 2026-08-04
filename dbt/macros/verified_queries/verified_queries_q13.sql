@@ -8,15 +8,15 @@
 
     is_shared_bathroom is a dimension, so the split is a plain query.
 
-    THE BASE IS 9 SHARED AGAINST 39 PRIVATE, so listings rides along on every
-    entry. That is a renovation case worth quantifying and a base too small to
-    call a penalty precisely, and a client that reports the gap without the
-    counts has dropped the more important half.
+    SHARED BATHROOMS ARE A SMALL MINORITY of the portfolio, so listings rides
+    along on every entry. That is a renovation case worth quantifying and a base
+    too small to call a penalty precisely, and a client that reports the gap
+    without the counts has dropped the more important half.
 
     The confound is worth knowing before the number is used: shared bathrooms sit
     disproportionately on private rooms rather than entire homes, so a raw split
     partly measures room type. The second entry breaks the same comparison out
-    within room_type, which is as far as 9 listings can be pushed.
+    within room_type, which is as far as this few listings can be pushed.
 
     bathrooms - the COUNT - is a separate column and does not indicate sharing.
     These entries name is_shared_bathroom only, so a client does not conclude that

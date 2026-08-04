@@ -12,12 +12,12 @@
 
     The wrong pick being avg_nightly_price, which is a FACT here and is neither of
     the two rates this question is about: it is the mean rate the listing was
-    OFFERED at across all 365 nights, booked or not. Confusing it with the
+    OFFERED at across every night of the window, booked or not. Confusing it with the
     achieved rate makes an unbooked listing look like a fully-priced one. So the
     entries name avg_achieved_rate and avg_list_price explicitly and never
     mention avg_nightly_price.
 
-    achieved_nightly_rate is NULL for the 3 listings never booked - dividing
+    achieved_nightly_rate is NULL for listings never booked - dividing
     revenue by zero nights - so those drop out of the averages rather than
     reading as zero-dollar rates.
 

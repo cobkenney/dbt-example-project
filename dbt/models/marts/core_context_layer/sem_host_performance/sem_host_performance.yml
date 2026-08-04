@@ -8,17 +8,17 @@ models:
 
       The only view with no `RELATIONSHIPS` clause — one logical table, nothing
       to join. Adding `dim_listings` would let a host measure be summed across
-      the listing join, double-counting the 7 hosts who hold more than one
+      the listing join, double-counting every host who holds more than one
       listing.
 
       Figures here are host-weighted; `sem_listing_performance` is the
       listing-weighted counterpart. The two give different answers to "host
-      occupancy" — 55.9% against 54.2% overall — and both are correct for their
-      own question, which is why both exist rather than one being derived.
+      occupancy" — and both are correct for their own question, which is why both
+      exist rather than one being derived.
 
-      Revenue here is $76,520 below the other three views. That is orphan listing
-      276450, which has no host row to attribute its revenue to, and the view
-      COMMENT says so.
+      Revenue here is short of the other three views by the orphan listings'
+      revenue, which has no host row to attribute it to. The view COMMENT says
+      so.
 
       Descriptions here do not reach Snowflake; the `COMMENT` clauses in the DDL
       do. See `sem_listing_daily.yml` for why there are no column docs or tests.

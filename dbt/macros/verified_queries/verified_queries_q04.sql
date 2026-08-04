@@ -7,17 +7,16 @@
     natural-language client matches an asked question against.
 
     avg_occupancy_rate, not occupancy_rate_weighted. The two are IDENTICAL on
-    this data, because calendar_days is 365 for all 50 listings, so picking
+    this data, because calendar_days is the same for every listing, so picking
     either returns the same number today. The listing-weighted one is still the
     right name for comparing segments, and pinning it means these queries keep
     answering the question asked if the snapshot ever covers listings for unequal
     windows and the two start to diverge.
 
-    listings rides along on every entry: some neighborhoods hold a single listing
-    - Back Bay is one - so an occupancy average here is thin, and the base
-    belongs next to it.
+    listings rides along on every entry: some neighborhoods hold a single listing,
+    so an occupancy average there is thin, and the base belongs next to it.
 
-    is_orphan_listing filtered out. Listing 276450 has NULL neighborhood and room
+    is_orphan_listing filtered out. An orphan has NULL neighborhood and room
     type, so it would otherwise form a NULL group. Correct here because the
     question compares attributes, and wrong for a revenue total.
 

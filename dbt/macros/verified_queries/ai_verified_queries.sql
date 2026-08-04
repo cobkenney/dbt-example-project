@@ -32,6 +32,19 @@
     query at create time either — a query against a table that does not exist
     builds green — so a query only becomes verified once the validator in
     TODO item 14 runs it and pins its result.
+
+    NO FIGURES IN THE HEADERS of the per-question macros, by convention. A header
+    says why its query is SHAPED the way it is and what the plausible wrong answer
+    would be; it does not restate what the query currently returns. A figure in a
+    comment is true of the load it was read off and goes wrong silently the next
+    time the source loads, with no test failing. Where a result is worth pinning,
+    the query returns it — several entries here carry a coverage count or a
+    side-by-side comparison for exactly that reason, so the number is read off the
+    warehouse rather than off a comment. The QUESTION and SQL text these macros
+    emit is figure-free for a stronger reason — a client reads it and would quote a
+    number in it as fact. Where a boundary is part of the query rather than a claim
+    about the data, such as a price band in a case expression, it stays: it is what
+    the query does, not what the data currently says.
 #}
 {% macro ai_verified_queries(questions, view=none) -%}
 

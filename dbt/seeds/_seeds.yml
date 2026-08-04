@@ -3,17 +3,19 @@ version: 2
 seeds:
   - name: known_amenity_names
     description: >
-      The 81 amenity names this project generates a flag for — a pinned list, not
-      source data and not a dimension. It does two jobs, and the second is why it
-      exists rather than being an inline list of literals:
+      The amenity names this project generates a flag for — a pinned list, not
+      source data and not a dimension. The CSV itself is the count; this file
+      does not restate it, because a regeneration would leave the restatement
+      wrong. It does two jobs, and the second is why it exists rather than being
+      an inline list of literals:
 
 
       1. `int_listing_amenities` relationships-tests `amenity_name` against it at
       `severity: warn`, so a new amenity upstream announces itself.
 
 
-      2. `int_listing_daily` LOOPS OVER IT to generate its 81 `has_*` flag
-      columns, via `get_amenity_names()`. This file is therefore the model's
+      2. `int_listing_daily` LOOPS OVER IT to generate one `has_*` flag column
+      per row, via `get_amenity_names()`. This file is therefore the model's
       column list. An amenity appearing or disappearing in the source cannot add
       or drop a column — only a commit to this file can, which is what makes a
       schema change reviewable rather than something that happens overnight.
@@ -31,7 +33,7 @@ seeds:
       silenced warning.
 
 
-      A SEED rather than 81 literal values in the yml, which is where this
+      A SEED rather than a list of literal values in the yml, which is where this
       started. What that bought: the list is regenerable by macro instead of by
       hand, the diff on a source change is one line instead of a churned test
       name, and the test and the codegen read the same list instead of two copies
@@ -48,7 +50,7 @@ seeds:
     config:
       tags: ['1x_day']
 
-      # A test fixture with 81 rows and no history worth keeping, unlike the
+      # A test fixture with no history worth keeping, unlike the
       # intermediate tables it supports. Transient is the dbt-snowflake default
       # and the right call here — overriding the +transient: false set for this
       # path in dbt_project.yml, which exists for models that need Time Travel.
@@ -67,7 +69,7 @@ seeds:
 
   - name: known_verification_methods
     description: >
-      The 11 host verification methods this project generates a flag for. Same two
+      The host verification methods this project generates a flag for. Same two
       jobs as `known_amenity_names`, same reasoning — see that seed's description.
 
 
@@ -75,8 +77,8 @@ seeds:
       against it at `severity: warn`.
 
 
-      2. `int_hosts` loops over it to generate its 11 `is_verified_*` columns, via
-      `get_verification_methods()`.
+      2. `int_hosts` loops over it to generate one `is_verified_*` column per
+      row, via `get_verification_methods()`.
 
 
       Regenerate rather than hand-edit:
@@ -84,30 +86,30 @@ seeds:
           dbt --quiet run-operation generate_known_verification_methods_seed > seeds/known_verification_methods.csv
 
 
-      A SEED at only 11 values, where `int_host_verifications.yml` used to argue
-      that 11 inline was fine. That was true while the list only fed a test. Job 2
-      is what changed it: a Jinja loop cannot read an `accepted_values` list out of
-      yml, so keeping the values inline would mean maintaining the same 11 in two
-      files by hand.
+      A SEED even at this short a list, where `int_host_verifications.yml` used to
+      argue that inline was fine. That was true while the list only fed a test.
+      Job 2 is what changed it: a Jinja loop cannot read an `accepted_values` list
+      out of yml, so keeping the values inline would mean maintaining the same list
+      in two files by hand.
 
 
       The stakes are higher here than for amenities, which is the other half of the
-      argument. `dim_hosts` names all 11 flags explicitly rather than passing them
+      argument. `dim_hosts` names every flag explicitly rather than passing them
       through, so a method disappearing from the source used to drop a column from
       `int_hosts` and break the mart at run time. Pinning the list means the flag
       survives, goes universally false, and stays queryable.
     config:
       tags: ['1x_day']
 
-      # Same call as known_amenity_names: a fixture with 11 rows and no history
+      # Same call as known_amenity_names: a fixture with no history
       # worth keeping, so transient overrides the +transient: false this path sets
       # for models that need Time Travel.
       transient: true
     columns:
       - name: verification_method
         description: >
-          The method exactly as the source JSON array spells it. All 11 are
-          lowercase snake_case identifiers — no apostrophes, commas or quotes, so
+          The method exactly as the source JSON array spells it. Every one is a
+          lowercase snake_case identifier — no apostrophes, commas or quotes, so
           unlike the amenity names these need no CSV escaping. Case matters:
           `verification_flag_name()` lowercases, so an upstream `Email` would
           collide with `email` rather than produce a second flag, and the

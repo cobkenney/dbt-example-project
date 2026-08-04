@@ -6,26 +6,24 @@
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    Verified in analyses/02_neighborhood_pricing.sql: Back Bay holds a single
-    listing (10813), whose $106 -> $150 move gives a $44.00 neighborhood average.
-
     THE PER-LISTING CTE IS THE POINT, not scaffolding. Averaging each listing's
     own price change and then averaging those is NOT the same as differencing two
     neighborhood averages - the second is wrong whenever the set of listings in
     the neighborhood differs between the two dates. It happens to agree on this
-    data, where all 50 listings span the whole window, and it would silently stop
+    data, where every listing spans the whole window, and it would silently stop
     agreeing the moment a listing entered or left. The endpoint prices are pulled
     per listing here for that reason.
 
     The dates are hardcoded endpoints rather than min and max of calendar_date. A
     semantic view cannot supply its own extent to its own filter, and the window
-    is a fixed snapshot - 2021-07-12 to 2022-07-11 - so pinning them is honest
-    rather than fragile. If the snapshot ever moves, this query returns empty
-    rather than quietly comparing the wrong two days.
+    is a fixed snapshot, so pinning them is honest rather than fragile - this is
+    the one place a date literal belongs, since it is the query's own bound and
+    not a claim about the data. If the snapshot ever moves, this query returns
+    empty rather than quietly comparing the wrong two days.
 
-    listings rides along on every entry: Back Bay is a single listing, so a
-    neighborhood average there is one number wearing a plural, and the base
-    belongs next to it.
+    listings rides along on every entry: some neighborhoods hold a single
+    listing, so a neighborhood average there is one number wearing a plural, and
+    the base belongs next to it.
 
     is_orphan_listing is filtered out - it has a NULL neighborhood and would
     otherwise form a NULL group. Correct here, because the question compares an

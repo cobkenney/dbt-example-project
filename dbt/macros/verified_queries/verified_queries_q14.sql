@@ -8,19 +8,19 @@
 
     CROSS-SECTIONAL ONLY, and every phrasing here is written to ask "goes with"
     rather than "impact of". Every amenity changelog event predates the calendar
-    window - the latest is 2021-07-06, the window opens 2021-07-12 - so there is
-    no before-and-after period in the data and the revenue effect of ADDING an
-    amenity cannot be measured at any modelling effort. The view COMMENT and
+    window entirely - asserted by tests/assert_amenities_predate_calendar.sql -
+    so there is no before-and-after period in the data and the revenue effect of
+    ADDING an amenity cannot be measured at any modelling effort. The view COMMENT and
     AI_SQL_GENERATION both say so; these entries avoid handing a client a query
     whose shape implies otherwise. That is why no entry is phrased "how much
     would adding X earn us".
 
     The comparison across amenities is a union with one branch per flag, because
     each amenity is its own boolean dimension and there is no single column to
-    group on. The branches are generated from a literal list of the six flags
+    group on. The branches are generated from a literal list of the flags
     this view declares - not from the source - so this needs no warehouse query
-    and no ref outside core_mart. int_listing_amenities holds all 81 amenities if
-    a question ever needs one without a flag here.
+    and no ref outside core_mart. int_listing_amenities holds the full amenity set
+    if a question ever needs one without a flag here.
 
     amenity_count is a FACT, so the banded entry is CTE-wrapped at listing grain.
     That one is the more honest read of the question anyway: it asks whether

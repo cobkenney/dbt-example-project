@@ -18,12 +18,12 @@
     with a row per distinct join date, and that is the point - it makes the
     clustering visible rather than averaging it away.
 
-    What these pin: tenure spans 9 to 14 years with host_since clustered in 2008
-    to 2009, so there is almost no variance here to explain performance with. The
+    What these pin: host_since is tightly clustered, so tenure spans only a narrow
+    range and there is almost no variance here to explain performance with. The
     honest answer to this question is that the data does not support one, and the
     phrasings are written to invite that rather than a correlation.
 
-    Tenure is anchored to as_of_date, 2022-07-11. Neither query mentions
+    Tenure is anchored to as_of_date. Neither query mentions
     current_date, which would drift on every run.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the

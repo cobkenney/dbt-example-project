@@ -12,8 +12,7 @@
     cannot express a window function at all. Rather than give up on the question
     here, int_listing_daily precomputes the run identity and fct_listing_daily
     carries it, so availability_window_seq is an ordinary dimension and the
-    window becomes a GROUP BY. See analyses/03_long_stay_picky_renter.sql, which
-    was refactored onto the same column.
+    window becomes a GROUP BY.
 
     Three rules the column does NOT encode, all of which produce a plausible
     wrong answer, and all of which therefore have to be written out here:
@@ -24,25 +23,23 @@
          the booked nights that follow it.
 
       2. Window length is count(*), NOT datediff(min, max), which is one lower.
-         Every available date is a bookable night: 2022-02-03 through 2022-07-11
-         is 159 nights, not 158.
+         Every available date is itself a bookable night, so a date difference
+         undercounts every window by one.
 
       3. The answer is least(window_length, maximum_nights). BOTH bind in this
-         data - the owner cap in 8 of 204 windows, the window itself in the rest
-         - so neither column alone answers it. Drop the clamp and listing 743211
-         reports a 206-night stay against a 90-night cap.
+         data - the owner cap on a minority of windows, the window itself on the
+         rest - so neither column alone answers it. Drop the clamp and a listing
+         reports a stay longer than its own owner cap allows.
+         tests/assert_stay_cap_binds.sql is what holds that premise.
 
     The CTE wrap is forced twice over. availability_window_seq is a DIMENSION, so
     it could sit in a metrics clause - but the aggregation is two-level (nights
     per window, then longest window per listing) and the clamp is arithmetic
     across two aggregates. Neither is expressible inside SEMANTIC_VIEW.
 
-    Verified in analyses/03: listing 1303261 -> 159 nights (159-night window
-    under a 180-night cap), then 182613 -> 112.
-
-    listing_name is pulled alongside listing_id rather than instead of it. The
-    orphan listing has a NULL name, and it is not filtered out here - it holds no
-    lockbox flag either way, so the amenity filter already excludes it.
+    listing_name is pulled alongside listing_id rather than instead of it. An
+    orphan listing has a NULL name, and orphans are not filtered out here - they
+    hold no lockbox flag either way, so the amenity filter already excludes them.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

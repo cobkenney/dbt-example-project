@@ -11,17 +11,19 @@
     listing_id grain, which determines them, then banded outside.
 
     TWO KINDS OF MISSING, and the query keeps them apart. review_scores_rating is
-    NULL on 3 listings that have never been reviewed - which is not a low score,
+    NULL on listings that have never been reviewed - which is not a low score,
     and averaging it as zero would invent one. The band expression gives those
     their own labelled bucket rather than dropping them silently, so the base is
     visible. has_reviews exists on the view for the same reason.
 
-    The score range is 0.00 to 5.00. Bands are fixed rather than quantiles so a
-    band means the same thing between runs.
+    Bands are fixed rather than quantiles so a band means the same thing between
+    runs. The boundaries below are the query's own, not a claim about the current
+    spread of scores.
 
     Both halves of the question are returned together - occupancy AND achieved
     rate - because "review investment pays" could mean either and the answer
-    differs. 50 listings is a thin base for either claim, so listings rides along.
+    differs. The portfolio is a thin base for either claim, so listings rides
+    along.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

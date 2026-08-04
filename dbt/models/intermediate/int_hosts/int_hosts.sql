@@ -2,13 +2,19 @@
 -- their listings.
 --
 -- Hosts arrive denormalized onto the listings table, not as their own source,
--- so this reconstructs the grain by grouping. 36 hosts hold 49 listings — 29
--- with one listing, 7 with several, up to 5.
+-- so this reconstructs the grain by grouping. Most hosts hold a single listing,
+-- with a thin tail holding several.
 --
--- Sourced from stg_listings rather than dim_listings to keep the intermediate
--- layer free of mart dependencies. The cost is that orphan listing 276450 is
--- absent here, which is correct: with no listings row it has no host_id, so it
--- cannot belong to any host.
+-- Sourced from int_listings rather than dim_listings to keep the intermediate
+-- layer free of mart dependencies. Orphan listings are excluded, which is
+-- correct: with no listings row an orphan has no host_id, so it cannot belong
+-- to any host.
+--
+-- That exclusion is now a stated filter rather than a side effect. Reading
+-- stg_listings, the orphan was absent because the model it came from did not
+-- have it — the right outcome for a reason unrelated to hosts, and invisible in
+-- this file. int_listings carries the orphans, so the filter has to be written
+-- down, and is_orphan_listing is what makes it sayable.
 --
 -- The seed below is what the generated is_verified_* flags are looped over, and
 -- the ref() has to be stated here rather than left inside
@@ -18,7 +24,13 @@
 -- depends_on: {{ ref('known_verification_methods') }}
 with listings as (
 
-    select * from {{ ref('stg_listings') }}
+    -- Orphans excluded here rather than downstream: host_id is NULL for them,
+    -- and grouping on that below would invent a host that does not exist. The
+    -- not_null test on host_id would catch it, but the filter states the intent
+    -- where a reader of this grain will look for it.
+    select *
+    from {{ ref('int_listings') }}
+    where not is_orphan_listing
 
 ),
 
@@ -65,8 +77,11 @@ per_listing as (
         listings.host_name_masked,
         listings.host_since,
         listings.host_location,
-        listings.host_verifications,
-        listings.price,
+        -- host_verifications is not selected here. It was, and was never
+        -- aggregated by the hosts CTE below — the flags come from the
+        -- int_host_verifications bridge, which is the only path that should
+        -- exist. int_listings carries no raw JSON, so the dead column is gone.
+        listings.list_price,
         listings.number_of_reviews,
         listings.review_scores_rating,
 
@@ -99,7 +114,7 @@ verification_flags as (
         -- SEED, so this column list is pinned to a committed file rather than
         -- to today's rows.
         --
-        -- It matters more here than for amenities. dim_hosts names all 11 flags
+        -- It matters more here than for amenities. dim_hosts names every flag
         -- explicitly, so back when this looped over `select distinct` on the
         -- source, a method disappearing upstream dropped a column here and
         -- broke the mart at run time — no test, no review, just a failed build
@@ -107,7 +122,7 @@ verification_flags as (
         -- verification_method against the same seed at severity warn, which is
         -- where a source change gets noticed instead.
         --
-        -- No coverage floor: email and phone are held by all 36 hosts and carry
+        -- No coverage floor: email and phone are held by every host and carry
         -- no predictive signal, but a universally-true flag is a tripwire. The
         -- day a host lands without a verified email, that flag goes false and
         -- is queryable — which is only possible if the column exists.
@@ -153,8 +168,9 @@ hosts as (
         sum(reservations) as reservations,
 
         -- Portfolio-wide rate, not the mean of per-listing rates: a host with a
-        -- 365-day listing and a 30-day one should not have the short one weigh
-        -- equally. div0 guards a host whose listings have no calendar rows.
+        -- full-year listing and a part-year one should not have the short one
+        -- weigh equally. div0 guards a host whose listings have no calendar
+        -- rows.
         div0(sum(booked_nights), sum(calendar_days)) as occupancy_rate,
 
         -- Weighted by reservations for the same reason.
@@ -162,7 +178,7 @@ hosts as (
             sum(avg_nights_per_stay * reservations), sum(reservations)
         ) as avg_nights_per_stay,
 
-        avg(price) as avg_list_price,
+        avg(list_price) as avg_list_price,
         sum(number_of_reviews) as total_reviews,
 
         -- Unweighted: this is the average of the host's listing scores, which
@@ -175,7 +191,7 @@ hosts as (
 
 )
 
--- select * because the verification flags are generated: naming the 11 here
+-- select * because the verification flags are generated: naming them here
 -- would duplicate the seed's list in a third place, and the failure mode of the
 -- copies disagreeing is a flag computed above and dropped silently on the way
 -- out. The seed is the one list; this passes through whatever it produced.

@@ -16,7 +16,8 @@
 
     WHY A MACRO AND NOT A HAND-EDITED FILE. The seed is the accepted-values list
     for int_listing_amenities.amenity_name, so it has to match the source exactly,
-    including the Unicode apostrophes in two of the names. Retyping a name is how
+    including the Unicode apostrophes some of the names carry. Retyping a name is
+    how
     a false positive gets committed, and the warning it silences is the one asking
     for the work.
 

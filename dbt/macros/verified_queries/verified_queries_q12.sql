@@ -14,7 +14,7 @@
     Note this is NOT the same normalization as question 22, which divides the
     nightly PRICE by bedrooms and beds in sem_listing_daily. Capacity is the
     clean denominator of the three - accommodates has no NULLs or zeros in this
-    data, where bedrooms is NULL on 8 listings and beds is 0 on 4.
+    data, where bedrooms goes NULL on some listings and beds goes to 0 on others.
 
     accommodates is a dimension here, so grouping by it needs no CTE.
 

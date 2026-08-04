@@ -28,8 +28,8 @@
     midweek here.
 
     No orphan filter on the day-of-week entries: they group on a date attribute,
-    not a listing attribute, and revenue totals should include listing 276450.
-    The room-type cross does filter it, since room_type is NULL for it.
+    not a listing attribute, and a revenue total should include the orphans.
+    The room-type cross does filter them, since room_type is NULL for an orphan.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

@@ -9,9 +9,9 @@
 -- snapshot ends.
 --
 -- Why the variable rather than a cross join matters more here than on
--- dim_hosts: the anchor has to reach orphan listing 276450, and that listing
--- has no host_id, so it cannot inherit the date from dim_hosts. A scalar in the
--- select list reaches every row without a join that could drop one.
+-- dim_hosts: the anchor has to reach the orphan listings, which have no host_id
+-- and so cannot inherit the date from dim_hosts. A scalar in the select list
+-- reaches every row without a join that could drop one.
 --
 -- The ref() stays literal Jinja inside the string — concatenating it with ~
 -- resolves to THIS model during parse and compiles to a silent self-reference.
@@ -20,22 +20,17 @@
               from {{ ref('int_listing_daily') }})"
 ) }}
 
-with amenities as (
+with listings as (
 
-    -- Driving table, not stg_listings — this sets the grain to all 50 listings
-    -- the calendar references, including orphan 276450.
+    -- Driving table, and where the grain comes from: every listing the calendar
+    -- references, including the orphans that stg_listings lacks.
     --
-    -- The bridge model, reduced to one row per listing. It carries no flags of
-    -- its own now that the pivot lives in int_listing_daily, so the six flags
-    -- this mart exposes come from daily_rollup below.
-    select distinct listing_id
-    from {{ ref('int_listing_amenities') }}
-
-),
-
-listings as (
-
-    select * from {{ ref('stg_listings') }}
+    -- This used to be two CTEs — `select distinct listing_id` off the amenities
+    -- bridge for the grain, left joined to stg_listings for the attributes —
+    -- with is_orphan_listing derived from whether that join found anything.
+    -- int_listings holds all three now, so this model no longer decides which
+    -- listings exist or which ones lack attributes; it reads both.
+    select * from {{ ref('int_listings') }}
 
 ),
 
@@ -57,12 +52,12 @@ daily_rollup as (
         -- aggregate returns the same value. min()/boolor_agg() collapse them
         -- back to listing grain without a second join to the bridge.
         --
-        -- Only the six flags this mart exposes, named explicitly rather than
-        -- carried in bulk: int_listing_daily generates all 81, and letting them
-        -- all through would let a new amenity upstream change this mart's
-        -- shape without anyone deciding to. Same friction as dim_hosts' 11
-        -- verification flags. Query int_listing_amenities for an amenity that
-        -- has no column here.
+        -- Only the flags this mart exposes, named explicitly rather than
+        -- carried in bulk: int_listing_daily generates one per known amenity,
+        -- and letting them all through would let a new amenity upstream change
+        -- this mart's shape without anyone deciding to. Same friction as
+        -- dim_hosts' verification flags. Query int_listing_amenities for an
+        -- amenity that has no column here.
         min(amenity_count) as amenity_count,
         boolor_agg(has_air_conditioning) as has_air_conditioning,
         boolor_agg(has_lockbox) as has_lockbox,
@@ -78,7 +73,7 @@ daily_rollup as (
 final as (
 
     select
-        amenities.listing_id,
+        listings.listing_id,
 
         listings.listing_name,
         listings.neighborhood,
@@ -109,7 +104,7 @@ final as (
         listings.host_since,
         listings.host_location,
 
-        listings.price as list_price,
+        listings.list_price,
 
         daily_rollup.amenity_count,
         daily_rollup.has_air_conditioning,
@@ -131,11 +126,14 @@ final as (
             daily_rollup.booked_nights, daily_rollup.calendar_days
         ) as occupancy_rate,
 
-        listings.listing_id is null as is_orphan_listing
+        -- Read, not recomputed. This model used to derive it from its own
+        -- left join to stg_listings, and int_listing_daily derived it
+        -- separately from its own — two copies of the same rule in two
+        -- layers. int_listings owns it now.
+        listings.is_orphan_listing
 
-    from amenities
-    left join listings on amenities.listing_id = listings.listing_id
-    left join daily_rollup on amenities.listing_id = daily_rollup.listing_id
+    from listings
+    left join daily_rollup on listings.listing_id = daily_rollup.listing_id
 
 )
 

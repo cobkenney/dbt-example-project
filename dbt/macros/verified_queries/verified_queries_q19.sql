@@ -7,22 +7,19 @@
     natural-language client matches an asked question against.
 
     This question gets the most phrasings of the four, because the finding runs
-    OPPOSITE to the intuition: multi-listing hosts earn roughly half the revenue
-    per property at two-thirds the occupancy. A client generating its own SQL is
+    OPPOSITE to the intuition: multi-listing hosts earn substantially LESS revenue
+    per property at lower occupancy. A client generating its own SQL is
     liable to reach for a listing-weighted figure, which answers a different
     question and gives the intuitive number instead. Every phrasing therefore
     lands on the same host-weighted query.
 
     median_revenue_per_listing rides along deliberately. The multi-listing
-    segment is 7 hosts, where a mean is one outlier away from misleading.
+    segment is a handful of hosts, where a mean is one outlier away from
+    misleading.
 
     avg_length_of_stay is here to show what the gap is NOT: stay length barely
     differs between the segments, so this is an occupancy story rather than a
     stay-length one.
-
-    Verified figures: 7 hosts holding 20 listings at 19,267.27 dollars per
-    listing and 38.46 percent occupancy, against 29 hosts at 39,748.97 and
-    60.05 percent. Stay length 6.2516 against 6.1098 nights.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.

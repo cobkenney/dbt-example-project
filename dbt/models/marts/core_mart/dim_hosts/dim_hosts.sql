@@ -9,8 +9,8 @@
 --
 -- The as_of_date that tenure is anchored to arrives as a session variable set
 -- by the pre-hook below, rather than as a one-row CTE cross joined onto every
--- host. Both produce the same column — verified identical: 36 rows, one
--- distinct as_of_date of 2022-07-11, tenure 9-14 years either way.
+-- host. Both produce the same column — verified identical: the same row count,
+-- a single distinct as_of_date, and the same tenure either way.
 --
 -- What the variable buys: a scalar in the select list cannot change the row
 -- count, so the host grain is preserved by construction. The cross join could
@@ -56,9 +56,8 @@ select
     hosts.host_since,
 
     -- Tenure and staleness measured against the snapshot's end, not
-    -- current_date. This data is a fixed year ending 2022-07-11, so
-    -- current_date would make every measure drift as time passes and give a
-    -- different answer on every run.
+    -- current_date. This data is a fixed year, so current_date would make every
+    -- measure drift as time passes and give a different answer on every run.
     $calendar_as_of_date as as_of_date,
     datediff(year, hosts.host_since, $calendar_as_of_date)
         as host_tenure_years,

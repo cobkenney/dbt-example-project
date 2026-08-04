@@ -9,10 +9,10 @@
     Two things these entries exist to pin:
 
     - The length measures come from avg_length_of_stay and
-      median_length_of_stay, which exclude the 70 censored reservations by
+      median_length_of_stay, which exclude the censored reservations by
       construction. censored_reservations rides along so the reader can see how
       much was dropped from each group.
-    - is_orphan_listing is filtered out. Listing 276450 has no listings row, so
+    - is_orphan_listing is filtered out. An orphan has no listings row, so
       its neighborhood and room_type are NULL and it would otherwise show up as
       an unnamed group. Filtering it is correct here because the question
       compares attributes, and wrong for a revenue total.

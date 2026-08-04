@@ -14,7 +14,10 @@ sources:
         description: One row per rental property listing, with host attributes denormalized onto it.
         columns:
           - name: id
-            description: Listing identifier. Natural key, but 2 rows land with a NULL id.
+            description: >
+              Listing identifier. Natural key, but some rows land with a NULL
+              id — the not_null test below warns rather than errors, and
+              stg_listings filters them out.
             data_tests:
               - unique
               - not_null:
@@ -51,7 +54,10 @@ sources:
         description: One row per listing per date, giving availability and nightly price.
         columns:
           - name: listing_id
-            description: References listings.id. 365 rows point at listing 276450, which is absent from listings.
+            description: >
+              References listings.id, but some rows point at a listing absent
+              from listings. The relationships test warns rather than errors so
+              those rows survive; it reports the current count when it fires.
             data_tests:
               - not_null
               - relationships:
@@ -61,7 +67,9 @@ sources:
                   config:
                     severity: warn
           - name: date
-            description: Calendar date the availability applies to. Spans 2021-07-12 to 2022-07-11.
+            description: >
+              Calendar date the availability applies to. The extract is a fixed
+              one-year window, not a rolling one.
             data_tests:
               - not_null
           - name: available
@@ -79,7 +87,10 @@ sources:
         description: Event log of amenity changes per listing. One row per listing per change timestamp.
         columns:
           - name: listing_id
-            description: References listings.id. 2 rows point at listing 276450, which is absent from listings.
+            description: >
+              References listings.id, but some rows point at a listing absent
+              from listings — same gap the calendar has. The relationships test
+              warns rather than errors so those rows survive.
             data_tests:
               - not_null
               - relationships:
