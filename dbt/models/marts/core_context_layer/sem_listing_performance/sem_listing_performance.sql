@@ -7,7 +7,7 @@
 -- daily view would make the same question an aggregation over every
 -- listing-night and invite grouping a lifetime measure by date.
 --
--- Answers business questions 4, 5, 7, 8, 9, 11, 12, 13, 14, 25 and 27.
+-- Answers business questions 4, 5, 7, 8, 9, 11, 12, 13, 14, 24 and 26.
 --
 -- The full amenity set is here rather than the three the daily fact carries, so
 -- question 14 (which amenities go with higher achieved rates) can reach every
@@ -84,11 +84,11 @@ FACTS (
         - (listing.total_revenue / nullif(listing.booked_nights, 0))
         COMMENT = 'Advertised rate minus achieved rate, in dollars. Question 8 - a large positive gap is weak discounting discipline, and a negative one means the listing earned above its ask.',
 
-    -- Question 25. Anchored to as_of_date, never current_date.
+    -- Question 24. Anchored to as_of_date, never current_date.
     listing.days_since_last_review
         AS datediff(day, listing.last_review_date, listing.as_of_date)
         WITH SYNONYMS = ('review recency', 'staleness')
-        COMMENT = 'Days between the most recent review and the snapshot end. Question 25. Measured against as_of_date rather than current_date, so the answer does not drift on every run. NULL for listings never reviewed, which is a DIFFERENT thing from stale.',
+        COMMENT = 'Days between the most recent review and the snapshot end. Question 24. Measured against as_of_date rather than current_date, so the answer does not drift on every run. NULL for listings never reviewed, which is a DIFFERENT thing from stale.',
 
     listing.months_since_last_review
         AS datediff(month, listing.last_review_date, listing.as_of_date)
@@ -198,7 +198,7 @@ DIMENSIONS (
 METRICS (
     listing.listings AS count(*)
         WITH SYNONYMS = ('listing count', 'properties', 'supply', 'inventory')
-        COMMENT = 'Number of listings in the slice. Grouped by neighborhood this is supply density - question 27, which was filed as needing a new neighborhood-grain model before this view existed.',
+        COMMENT = 'Number of listings in the slice. Grouped by neighborhood this is supply density - question 26, which was filed as needing a new neighborhood-grain model before this view existed.',
 
     listing.portfolio_revenue AS sum(listing.total_revenue)
         WITH SYNONYMS = ('total revenue', 'revenue')
@@ -270,7 +270,7 @@ METRICS (
         COMMENT = 'Mean number of amenities. Question 14 - but read the view COMMENT on why amenity comparisons here are cross-sectional only.',
 
     listing.avg_days_since_last_review AS avg(listing.days_since_last_review)
-        COMMENT = 'Mean days since the last review, anchored to as_of_date rather than current_date. Question 25.',
+        COMMENT = 'Mean days since the last review, anchored to as_of_date rather than current_date. Question 24.',
 
     listing.stalest_days_since_review AS max(listing.days_since_last_review)
         COMMENT = 'Longest gap since a review in the slice, anchored to as_of_date.',
@@ -288,7 +288,7 @@ AI_SQL_GENERATION 'Measures here are already lifetime totals per listing, so nev
     in macros/verified_queries/, one macro per question.
 
     Three shapes in here. Most group on dimensions and are plain
-    SEMANTIC_VIEW(...) queries. Questions 9, 11, 14 and 25 band a FACT -
+    SEMANTIC_VIEW(...) queries. Questions 9, 11, 14 and 24 band a FACT -
     list_price, review score, amenity count, staleness - and Snowflake rejects
     FACTS and METRICS in one clause, so those are CTE-wrapped at listing grain.
     Question 7 is CTE-wrapped for a different reason: revenue concentration needs
@@ -304,5 +304,5 @@ AI_SQL_GENERATION 'Measures here are already lifetime totals per listing, so nev
 #}
 {{ ai_verified_queries([
     'q04', 'q05', 'q07', 'q08', 'q09',
-    'q11', 'q12', 'q13', 'q14', 'q25', 'q27',
+    'q11', 'q12', 'q13', 'q14', 'q24', 'q26',
 ]) }}

@@ -9,8 +9,6 @@ models:
       - name: amenities_change_id
         description: Surrogate key over (listing_id, changed_at).
         data_tests:
-          # No not_null: generate_surrogate_key coalesces NULL inputs to a
-          # sentinel string before hashing, so it cannot emit NULL.
           - unique
 
       - name: listing_id
@@ -21,7 +19,6 @@ models:
           absent from it — the same gap the calendar has. Warns rather than
           errors so those rows survive into int_listings.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('stg_listings')

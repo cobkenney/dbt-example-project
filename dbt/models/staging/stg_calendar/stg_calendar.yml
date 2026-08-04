@@ -11,14 +11,6 @@ models:
       - name: calendar_id
         description: "{{ doc('calendar_id') }}"
         data_tests:
-          # No not_null: generate_surrogate_key coalesces NULL inputs to a
-          # sentinel string before hashing, so it cannot emit NULL.
-          #
-          # unique here is also what asserts the (listing_id, calendar_date)
-          # grain — the key is the hash of exactly that pair — so there is no
-          # separate unique_combination_of_columns test on this model. It is the
-          # error-severity counterpart to the warn-severity grain test on the
-          # source, which surfaces the duplicates this model collapses.
           - unique
 
       - name: listing_id

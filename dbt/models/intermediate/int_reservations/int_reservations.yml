@@ -16,14 +16,8 @@ models:
       - name: reservation_key
         description: "{{ doc('reservation_key') }}"
         data_tests:
-          # No not_null: generate_surrogate_key cannot emit NULL. unique is the
-          # real assertion — it is what proves the grain reduction collapsed each
-          # (listing, reservation) into exactly one row.
           - unique
 
-      # No not_null on reservation_id or listing_id: the booked_nights CTE
-      # filters `where reservation_id is not null`, and listing_id is a group-by
-      # key inherited from stg_calendar, which tests it.
       - name: reservation_id
         description: >
           {{ doc('reservation_id') }}
@@ -33,10 +27,6 @@ models:
       - name: listing_id
         description: "{{ doc('listing_id') }}"
 
-      # No not_null on the dates. check_in_date and last_night_date are
-      # min()/max() over a group that exists only because it had rows, and
-      # check_out_date is dateadd() over last_night_date. The assertion that
-      # matters for these is the contiguity test at the model level.
       - name: check_in_date
         description: "{{ doc('check_in_date') }}"
 
@@ -46,9 +36,6 @@ models:
       - name: check_out_date
         description: "{{ doc('check_out_date') }}"
 
-      # No tests on nights: count(*) within a group is never NULL and never < 1,
-      # so both the not_null and the accepted_range(min 1) were unfalsifiable.
-      # is_contiguous is what actually validates this number.
       - name: nights
         description: "{{ doc('nights') }}"
 
@@ -68,11 +55,6 @@ models:
           reservation_revenue / nights, since revenue is the price on every
           booked night.
 
-      # No not_null on the four booleans below. Each is a comparison — datediff
-      # equality, two date equalities against the calendar window, and boolor_agg
-      # over a non-NULL input — so each returns true or false, never NULL.
-      # is_contiguous additionally carries a model-level assertion that it is
-      # true, which subsumes any claim that it is non-NULL.
       - name: is_contiguous
         description: "{{ doc('is_contiguous') }}"
 
@@ -91,12 +73,5 @@ models:
           arguments:
             expression: is_contiguous
 
-      # No check_out_date > check_in_date test: check_out_date is
-      # dateadd(day, 1, max(calendar_date)) and check_in_date is
-      # min(calendar_date) over the same group, so the inequality is arithmetic.
-      #
-      # No grain test on (listing_id, reservation_id) — reservation_key is the
-      # hash of exactly that pair, so `unique` on it asserts the same fact.
-      #
       # Every booked night lands in exactly one reservation — see
       # tests/assert_reservation_nights_reconcile.sql.

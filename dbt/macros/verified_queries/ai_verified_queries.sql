@@ -2,7 +2,7 @@
     Emits the whole AI_VERIFIED_QUERIES clause for a semantic view, so each
     view file carries one line rather than a wall of quoted SQL.
 
-        {{ ai_verified_queries(['q17', 'q23', 'q24']) }}
+        {{ ai_verified_queries(['q17', 'q22', 'q23']) }}
 
     Each question name resolves to a verified_queries_<name> macro, called with
     the view relation and returning a list of {name, question, sql} entries.
@@ -25,7 +25,7 @@
 
     Escaping rather than forbidding, unlike the COMMENT convention elsewhere in
     these views: a verified query legitimately contains quoted strings of its own.
-    The union branches in q21 label each row with a method name, and that label
+    The union branches in q14 label each row with an amenity name, and that label
     has to be a literal. Callers can write apostrophes freely.
 
     Nothing about the SQL is validated. Snowflake does not check a verified

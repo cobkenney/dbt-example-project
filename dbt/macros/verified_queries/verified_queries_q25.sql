@@ -1,27 +1,42 @@
 {#
-    Verified queries for business question 25 — which listings have gone stale,
-    with no recent reviews. Against sem_listing_performance.
+    Verified queries for business question 25 — revenue lost to unbookable
+    availability windows. Against sem_listing_daily.
 
     Returns a list of {name, question, sql} entries. Several entries may share
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    THIS QUESTION IS THE REASON as_of_date EXISTS. The snapshot is a fixed window,
-    so recency measured against current_date drifts on every run and every answer
-    silently ages. days_since_last_review and months_since_last_review are
-    anchored to as_of_date instead, and pinning them here is what keeps a client
-    from writing datediff against current_date. It was filed as needing a new
-    model for exactly this reason; the anchored facts on the view are that work.
+    The question: a contiguous run of open nights SHORTER than the listing's
+    minimum-stay requirement cannot be sold at all. Nobody can book it, so it is
+    not vacancy waiting for demand - it is inventory the pricing rules have
+    removed from sale. Same gap-and-island as question 3, and the same reason it
+    is expressible here: availability_window_seq is precomputed on
+    fct_listing_daily, so the run is a GROUP BY rather than a window function.
+    See verified_queries_q03 for the three rules the column does not encode.
 
-    NEVER REVIEWED IS NOT STALE. last_review_date is NULL on listings that
-    have no reviews at all, so days_since_last_review is NULL for them too - not a
-    large number. Sorting descending on it puts NULLs first unless told otherwise,
-    which reads as the stalest listings in the portfolio. Every entry here uses
-    `nulls last` and returns has_reviews, so the two states stay distinguishable.
+    Verified against the marts. The portfolio entry returns the counts and the
+    share, so the size of the loss is read off the query rather than restated
+    here.
 
-    days_since_last_review is a FACT, so the banded entry is CTE-wrapped at
-    listing grain. The range runs to several years on the stalest listing, so the
-    top band has to be open-ended.
+    max_minimum_nights, not avg_minimum_nights. minimum_nights VARIES inside some
+    windows, and a stay covering the run has to clear the requirement on every
+    night of it, so the strictest night is the binding one. Taking the mean instead
+    UNDERCOUNTS the unbookable windows.
+
+    The lost value is the sum of the nightly PRICES asked on those nights, not
+    revenue - revenue is NULL on an available night by construction, so summing
+    it here returns nothing. It is an upper bound on the opportunity: it assumes
+    every one of those nights would otherwise have sold at its asking rate, which
+    at the portfolio occupancy rate it would not.
+
+    That sum is reconstructed as calendar_nights * avg_nightly_price, because the
+    view exposes no sum-of-price metric - deliberately, since a total of asking
+    prices across booked and open nights alike is not a quantity anybody wants by
+    default. count(*) * avg(price) is exactly sum(price) as long as price is
+    never NULL, which stg_calendar tests.
+
+    The by-listing entry is the actionable one. Fixing this means lowering a
+    minimum-stay setting, and that is a per-listing decision.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.
@@ -30,98 +45,126 @@
 
     {%- set view = view or this -%}
 
-    {%- set stalest_sql -%}
-select *
-from semantic_view(
-    {{ view }}
-    metrics
-        listing.avg_days_since_last_review,
-        listing.total_reviews,
-        listing.avg_occupancy_rate,
-        listing.portfolio_revenue
-    dimensions
-        listing.listing_id,
-        listing.listing_name,
-        listing.neighborhood,
-        listing.last_review_date,
-        listing.has_reviews
-    where listing.has_reviews and not listing.is_orphan_listing
-)
-order by avg_days_since_last_review desc nulls last
-    {%- endset -%}
-
-    {%- set never_reviewed_sql -%}
-select *
-from semantic_view(
-    {{ view }}
-    metrics
-        listing.listings,
-        listing.avg_days_since_last_review,
-        listing.stalest_days_since_review,
-        listing.total_reviews,
-        listing.avg_occupancy_rate
-    dimensions listing.has_reviews
-    where not listing.is_orphan_listing
-)
-order by has_reviews desc
-    {%- endset -%}
-
-    {%- set by_staleness_band_sql -%}
-with listing_facts as (
+    {#- Shared by every entry: one row per availability window, with the -#}
+    {#- strictest minimum-stay across it and the asking value of its nights. -#}
+    {%- set windows_cte -%}
+with windows as (
     select *
     from semantic_view(
         {{ view }}
+        metrics
+            daily.calendar_nights,
+            daily.max_minimum_nights,
+            daily.avg_nightly_price
         dimensions
-            listing.listing_id,
-            listing.is_orphan_listing
-        facts
-            listing.months_since_last_review,
-            listing.number_of_reviews,
-            listing.occupancy_rate,
-            listing.total_revenue
+            daily.listing_id,
+            listing.listing_name,
+            daily.availability_window_seq
+        where daily.is_available
     )
+),
+
+classified as (
+    select
+        listing_id,
+        listing_name,
+        availability_window_seq,
+        calendar_nights as window_length_nights,
+        max_minimum_nights as minimum_nights,
+        calendar_nights < max_minimum_nights as is_unbookable,
+        calendar_nights * avg_nightly_price as window_asking_value
+    from windows
 )
+    {%- endset -%}
+
+    {%- set portfolio_sql -%}
+{{ windows_cte }}
 
 select
-    case
-        when months_since_last_review is null then '0. never reviewed'
-        when months_since_last_review <= 3 then '1. within 3 months'
-        when months_since_last_review <= 12 then '2. 4 to 12 months'
-        when months_since_last_review <= 36 then '3. 1 to 3 years'
-        else '4. over 3 years'
-    end as staleness_band,
-    count(*) as listings,
-    round(avg(number_of_reviews), 1) as avg_reviews,
-    round(avg(occupancy_rate), 4) as avg_occupancy_rate,
-    round(avg(total_revenue), 2) as avg_revenue
-from listing_facts
-where not is_orphan_listing
+    count(*) as availability_windows,
+    count_if(is_unbookable) as unbookable_windows,
+    sum(case when is_unbookable then window_length_nights end)
+        as unbookable_nights,
+    round(sum(case when is_unbookable then window_asking_value end), 2)
+        as unbookable_asking_value,
+    sum(window_length_nights) as all_available_nights,
+    round(sum(window_asking_value), 2) as all_available_asking_value,
+    round(
+        100 * sum(case when is_unbookable then window_asking_value end)
+        / sum(window_asking_value),
+        2
+    ) as pct_of_open_inventory_unbookable
+from classified
+    {%- endset -%}
+
+    {%- set by_listing_sql -%}
+{{ windows_cte }}
+
+select
+    listing_id,
+    listing_name,
+    count(*) as availability_windows,
+    count_if(is_unbookable) as unbookable_windows,
+    max(minimum_nights) as strictest_minimum_nights,
+    sum(case when is_unbookable then window_length_nights end)
+        as unbookable_nights,
+    round(sum(case when is_unbookable then window_asking_value end), 2)
+        as unbookable_asking_value
+from classified
 group by all
-order by staleness_band
+having count_if(is_unbookable) > 0
+order by unbookable_asking_value desc
+    {%- endset -%}
+
+    {%- set detail_sql -%}
+{{ windows_cte }}
+
+select
+    listing_id,
+    listing_name,
+    availability_window_seq,
+    window_length_nights,
+    minimum_nights,
+    round(window_asking_value, 2) as window_asking_value
+from classified
+where is_unbookable
+order by window_asking_value desc
     {%- endset -%}
 
     {{ return([
         {
             'name': 'q25_a',
-            'question': 'Which listings have gone stale with no recent '
-                        ~ 'reviews?',
-            'sql': stalest_sql,
+            'question': 'How much revenue is lost to availability windows that '
+                        ~ 'are too short to book?',
+            'sql': portfolio_sql,
         },
         {
             'name': 'q25_b',
-            'question': 'Which listings have not been reviewed in a long time?',
-            'sql': stalest_sql,
+            'question': 'How many open nights cannot be sold because the gap is '
+                        ~ 'shorter than the minimum stay?',
+            'sql': portfolio_sql,
         },
         {
             'name': 'q25_c',
-            'question': 'How long has it been since our listings were '
-                        ~ 'reviewed?',
-            'sql': by_staleness_band_sql,
+            'question': 'What share of our open inventory is unbookable?',
+            'sql': portfolio_sql,
         },
         {
             'name': 'q25_d',
-            'question': 'Which listings have never been reviewed at all?',
-            'sql': never_reviewed_sql,
+            'question': 'Which listings lose the most to unbookable gaps in '
+                        ~ 'their calendar?',
+            'sql': by_listing_sql,
+        },
+        {
+            'name': 'q25_e',
+            'question': 'Where should we lower the minimum-stay requirement?',
+            'sql': by_listing_sql,
+        },
+        {
+            'name': 'q25_f',
+            'question': 'List every availability window that is shorter than '
+                        ~ 'the minimum stay allowed',
+            'sql': detail_sql,
         },
     ]) }}
 {%- endmacro %}

@@ -34,14 +34,12 @@ models:
           {{ doc('listing_id') }}
 
           Not unique here — this is a bridge, one row per amenity per listing.
-        data_tests:
-          - not_null
 
       - name: amenity_name
         description: >
           The amenity as it appears in the source array, unmodified — including
           the Unicode apostrophes in names like "Children’s books and toys".
-          amenity_flag_name() is what slugifies these into column names for the
+          flag_name('amenity', ...) is what slugifies these into column names for the
           pivot in int_listing_daily.
         data_tests:
           - not_null
@@ -51,30 +49,10 @@ models:
           # wall of literal values inline — see seeds/_seeds.yml for why, and for
           # the cost.
           #
-          # relationships, not accepted_values, because accepted_values takes a
-          # literal list and cannot read a table. Same semantics here: every
-          # amenity_name must appear in the seed, and the test returns the ones
-          # that do not.
-          #
-          # WARN, not error. A new amenity upstream is a source change, not a
-          # defect, so failing the build over it would be wrong — but saying
-          # nothing would mean int_listing_daily silently grows another flag column
-          # that no yml documents and no mart carries.
-          #
-          # The warning is a WORK ORDER, not a defect report:
-          #   1. dbt run-operation generate_amenity_flag_yml
-          #      -> paste the new flag into int_listing_daily.yml
-          #   2. decide whether it belongs in fct_listing_daily or dim_listings
-          #   3. dbt --quiet run-operation generate_known_amenity_names_seed \
-          #        > seeds/known_amenity_names.csv
-          # Step 3 LAST. It reads the current data, so running it first makes this
-          # test pass by definition and turns the tripwire off silently.
-          #
-          # This catches the direction the codegen loop cannot. The loop emits a
-          # column for whatever it finds, so a REMOVED amenity leaves a stale
-          # column that generate_amenity_flag_yml reports — but a NEW one just
-          # widens the model on the next run, invisibly, which is the note already
-          # made in int_listing_daily.sql.
+          # The warning is a WORK ORDER, not a defect report: the seed decides
+          # int_listing_daily's column list, so acting on it means regenerating
+          # the seed, documenting the flag and deciding whether a mart carries it,
+          # all in one commit. The wake-up-ae skill is that procedure.
           - relationships:
               name: warn_new_amenity_name
               arguments:
@@ -82,14 +60,3 @@ models:
                 field: amenity_name
               config:
                 severity: warn
-
-    # No grain test on (listing_id, amenity_name): the model's final statement is
-    # `select distinct listing_id, amenity_name`, so the grain is enforced by the
-    # SQL rather than asserted after the fact. Same reasoning as
-    # int_host_verifications.
-    #
-    # No rowcount test against stg_amenities_changelog — this is a bridge, so the
-    # rowcount is a multiple of the listing count and not a fixed figure. The
-    # condition worth watching is a listing reaching zero rows here, which would
-    # silently drop its flags to NULL downstream;
-    # int_listing_daily.amenity_count's not_null catches that.

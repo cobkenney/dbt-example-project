@@ -45,19 +45,17 @@ One query against the marts, no new modeling.
 | 18 | Host portfolio performance | Which hosts to invest in | `dim_hosts` — `listing_count`, `revenue_per_listing`, `occupancy_rate` |
 | 19 | Multi-listing operators vs casual hosts | Two different business relationships | `dim_hosts` — group on `is_multi_listing_host` |
 | 20 | Does host tenure predict performance | Whether experience shows up in results | `dim_hosts` — `host_tenure_years`. Little variance to work with: `host_since` clusters in 2008–2009 |
-| 21 | Do host trust signals correlate with occupancy | Whether verification is worth requiring | `dim_hosts` — `verification_count`, `is_verified_*`. 36 hosts against 11 methods is too few to conclude from |
-| 22 | Price per bedroom and per bed | Compares a 4-bed against a studio fairly | `fct_listing_daily` — `price / bedrooms`, `price / nullif(beds, 0)`. `bedrooms` is NULL on 8 listings, `beds` is 0 on 4 |
-| 23 | Which reservations span a month boundary | Whether monthly revenue splits need proration | `fct_reservations` — compare `check_in_month` against `last_night_date` |
-| 24 | Length-of-stay distribution by neighborhood or room type | Which inventory attracts long stays | `fct_reservations` — `nights` by `neighborhood`, `room_type` |
+| 21 | Price per bedroom and per bed | Compares a 4-bed against a studio fairly | `fct_listing_daily` — `price / bedrooms`, `price / nullif(beds, 0)`. `bedrooms` is NULL on 8 listings, `beds` is 0 on 4 |
+| 22 | Which reservations span a month boundary | Whether monthly revenue splits need proration | `fct_reservations` — compare `check_in_month` against `last_night_date` |
+| 23 | Length-of-stay distribution by neighborhood or room type | Which inventory attracts long stays | `fct_reservations` — `nights` by `neighborhood`, `room_type` |
 
 ## Need a new model or a non-obvious query
 
 | # | Question | What it takes |
 |---|---|---|
-| 25 | Which listings have gone stale — no recent reviews | `last_review_date` is on `dim_listings` but unused. Needs a recency measure against a fixed reference date, not `current_date` — the snapshot ends 2022-07-11, so `current_date` drifts on every run |
-| 26 | Revenue lost to unbookable availability windows | A contiguous run shorter than the listing's `minimum_nights` is real vacancy that cannot be sold. Needs the same gap-and-island as question 3, then compare run length to `minimum_nights` — reproducible from `fct_listing_daily`, no new model required |
-| 27 | Neighborhood supply density vs achieved rate | ~~Needs a neighborhood-grain aggregate, which doesn't exist.~~ Answerable today: `sem_listing_performance` exposes `listings` (a distinct listing count) and the achieved-rate metrics, so grouping on `neighborhood` **is** the aggregate. No new model was needed |
-| 28 | Repeat bookings — does any guest return | `reservation_id` identifies a booking, not a guest. Unanswerable without guest identity in the source; listed here rather than under Cannot answer because a guest key would make it a modeling question |
+| 24 | Which listings have gone stale — no recent reviews | `last_review_date` is on `dim_listings` but unused. Needs a recency measure against a fixed reference date, not `current_date` — the snapshot ends 2022-07-11, so `current_date` drifts on every run |
+| 25 | Revenue lost to unbookable availability windows | A contiguous run shorter than the listing's `minimum_nights` is real vacancy that cannot be sold. Needs the same gap-and-island as question 3, then compare run length to `minimum_nights` — reproducible from `fct_listing_daily`, no new model required |
+| 26 | Neighborhood supply density vs achieved rate | ~~Needs a neighborhood-grain aggregate, which doesn't exist.~~ Answerable today: `sem_listing_performance` exposes `listings` (a distinct listing count) and the achieved-rate metrics, so grouping on `neighborhood` **is** the aggregate. No new model was needed |
 
 ## Cannot answer — the source data doesn't support it
 

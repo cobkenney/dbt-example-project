@@ -1,7 +1,7 @@
 -- One row per listing per date — the daily grain the marts aggregate from.
 --
 -- The seed below is what the generated amenity flags are looped over, and the
--- ref() has to be stated here rather than left to get_amenity_names(): a ref
+-- ref() has to be stated here rather than left to get_flag_values(): a ref
 -- inside a macro is invisible to dbt's parser, so without this line dbt would
 -- schedule this model without waiting for the seed to load.
 -- depends_on: {{ ref('known_amenity_names') }}
@@ -45,11 +45,11 @@ amenities as (
     -- so a new amenity announces itself on the next build instead of arriving
     -- as an unreviewed column.
     --
-    -- The amenity name goes through sql_string_literal rather than being quoted
-    -- inline. Inline escaping leaves an odd number of apostrophes on the line,
-    -- which SQL highlighters read as an unterminated string — every line after
-    -- the loop then renders as a string literal. It matters more here than
-    -- anywhere: several source amenity names carry Unicode apostrophes already.
+    -- The amenity name is emitted as a quoted literal with any apostrophe
+    -- doubled. No source name carries an ASCII apostrophe today — the ones
+    -- that look like they do use U+2019, which needs no escaping — but the
+    -- values are source data, and one named with a possessive would otherwise
+    -- end its own literal and break the compile on every iteration.
     select
         listing_id,
         count(distinct amenity_name) as amenity_count,
@@ -61,8 +61,8 @@ amenities as (
         -- the loop's indentation is set by Jinja whitespace control rather than
         -- by layout.
         -- noqa: disable=LT02,LT05
-        {%- for amenity_name in get_amenity_names() %}
-        boolor_agg(amenity_name = {{ sql_string_literal(amenity_name) }}) as {{ amenity_flag_name(amenity_name) }}{{ "," if not loop.last }}
+        {%- for amenity_name in get_flag_values('amenity') %}
+        boolor_agg(amenity_name = '{{ amenity_name | replace("'", "''") }}') as {{ flag_name('amenity', amenity_name) }}{{ "," if not loop.last }}
         {%- endfor %}
     -- noqa: enable=all
     from {{ ref('int_listing_amenities') }}
@@ -111,8 +111,8 @@ joined as (
         -- deliberately narrow this to the handful of flags they use — see
         -- fct_listing_daily and dim_listings.
         -- noqa: disable=LT02,LT05
-        {%- for amenity_name in get_amenity_names() %}
-        amenities.{{ amenity_flag_name(amenity_name) }}{{ "," if not loop.last }}
+        {%- for amenity_name in get_flag_values('amenity') %}
+        amenities.{{ flag_name('amenity', amenity_name) }}{{ "," if not loop.last }}
         {%- endfor %}
     -- noqa: enable=all
 
@@ -134,7 +134,7 @@ window_starts as (
 
     -- Marks the first available night of each contiguous run of available
     -- nights. The ingredient for the availability-window questions — #3
-    -- (longest possible stay) and #26 (revenue lost to unbookable windows) —
+    -- (longest possible stay) and #25 (revenue lost to unbookable windows) —
     -- which otherwise each write the gap-and-island window function themselves.
     --
     -- Two window functions rather than one because is_window_start cannot be

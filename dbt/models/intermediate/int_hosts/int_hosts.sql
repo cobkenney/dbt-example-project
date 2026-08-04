@@ -17,10 +17,9 @@
 -- down, and is_orphan_listing is what makes it sayable.
 --
 -- The seed below is what the generated is_verified_* flags are looped over, and
--- the ref() has to be stated here rather than left inside
--- get_verification_methods(): a ref inside a macro is invisible to dbt's
--- parser, so without this line dbt would schedule this model without waiting
--- for the seed to load.
+-- the ref() has to be stated here rather than left inside get_flag_values(): a
+-- ref inside a macro is invisible to dbt's parser, so without this line dbt
+-- would schedule this model without waiting for the seed to load.
 -- depends_on: {{ ref('known_verification_methods') }}
 with listings as (
 
@@ -127,19 +126,19 @@ verification_flags as (
         -- day a host lands without a verified email, that flag goes false and
         -- is queryable — which is only possible if the column exists.
         --
-        -- The method name goes through sql_string_literal rather than being
-        -- quoted inline. Inline escaping leaves an odd number of apostrophes on
-        -- the line, which SQL highlighters read as an unterminated string —
-        -- every line after the loop then renders as a string. dbt compiles
-        -- either form correctly; this one is also readable in an editor.
+        -- The method name is emitted as a quoted literal with any apostrophe
+        -- doubled. Every method is a snake_case identifier today, so the escape
+        -- is a no-op — it stays because the values are source data, and one
+        -- carrying an apostrophe would end its own literal and break the
+        -- compile.
         --
         -- LT02/LT05 disabled for the loop body only, as in
         -- int_listing_daily: sqlfluff lints the compiled output, where the
         -- generated identifiers and indentation are set by Jinja whitespace
         -- control rather than source formatting.
         -- noqa: disable=LT02,LT05
-        {%- for method_name in get_verification_methods() %}
-        boolor_agg(verification_method = {{ sql_string_literal(method_name) }}) as {{ verification_flag_name(method_name) }}{{ "," if not loop.last }}
+        {%- for method_name in get_flag_values('verification') %}
+        boolor_agg(verification_method = '{{ method_name | replace("'", "''") }}') as {{ flag_name('verification', method_name) }}{{ "," if not loop.last }}
         {%- endfor %}
     -- noqa: enable=all
     from {{ ref('int_host_verifications') }}

@@ -1,42 +1,25 @@
 {#
-    Verified queries for business question 26 — revenue lost to unbookable
-    availability windows. Against sem_listing_daily.
+    Verified queries for business question 26 — neighborhood supply density
+    against achieved rate. Against sem_listing_performance.
 
     Returns a list of {name, question, sql} entries. Several entries may share
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    The question: a contiguous run of open nights SHORTER than the listing's
-    minimum-stay requirement cannot be sold at all. Nobody can book it, so it is
-    not vacancy waiting for demand - it is inventory the pricing rules have
-    removed from sale. Same gap-and-island as question 3, and the same reason it
-    is expressible here: availability_window_seq is precomputed on
-    fct_listing_daily, so the run is a GROUP BY rather than a window function.
-    See verified_queries_q03 for the three rules the column does not encode.
+    THIS QUESTION WAS FILED AS NEEDING A NEW MODEL and does not. It wanted a
+    neighborhood-grain aggregate, and grouping the `listings` metric by
+    neighborhood IS that aggregate - no new model was required. So the entry
+    exists partly to record that the question is answerable, since the doc listed
+    it under "need a new model" before this view existed.
 
-    Verified against the marts. The portfolio entry returns the counts and the
-    share, so the size of the loss is read off the query rather than restated
-    here.
+    THE BASE IS THE FINDING HERE. Some neighborhoods hold a single listing, so a
+    per-neighborhood achieved rate can rest on one property.
+    listings is first in the select list on every entry for that reason: a density
+    comparison that hides its denominator is the failure mode of this question,
+    not a detail.
 
-    max_minimum_nights, not avg_minimum_nights. minimum_nights VARIES inside some
-    windows, and a stay covering the run has to clear the requirement on every
-    night of it, so the strictest night is the binding one. Taking the mean instead
-    UNDERCOUNTS the unbookable windows.
-
-    The lost value is the sum of the nightly PRICES asked on those nights, not
-    revenue - revenue is NULL on an available night by construction, so summing
-    it here returns nothing. It is an upper bound on the opportunity: it assumes
-    every one of those nights would otherwise have sold at its asking rate, which
-    at the portfolio occupancy rate it would not.
-
-    That sum is reconstructed as calendar_nights * avg_nightly_price, because the
-    view exposes no sum-of-price metric - deliberately, since a total of asking
-    prices across booked and open nights alike is not a quantity anybody wants by
-    default. count(*) * avg(price) is exactly sum(price) as long as price is
-    never NULL, which stg_calendar tests.
-
-    The by-listing entry is the actionable one. Fixing this means lowering a
-    minimum-stay setting, and that is a per-listing decision.
+    Orphan listing filtered out - it has a NULL neighborhood and would otherwise
+    form a group whose name is missing.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.
@@ -45,126 +28,62 @@
 
     {%- set view = view or this -%}
 
-    {#- Shared by every entry: one row per availability window, with the -#}
-    {#- strictest minimum-stay across it and the asking value of its nights. -#}
-    {%- set windows_cte -%}
-with windows as (
-    select *
-    from semantic_view(
-        {{ view }}
-        metrics
-            daily.calendar_nights,
-            daily.max_minimum_nights,
-            daily.avg_nightly_price
-        dimensions
-            daily.listing_id,
-            listing.listing_name,
-            daily.availability_window_seq
-        where daily.is_available
-    )
-),
-
-classified as (
-    select
-        listing_id,
-        listing_name,
-        availability_window_seq,
-        calendar_nights as window_length_nights,
-        max_minimum_nights as minimum_nights,
-        calendar_nights < max_minimum_nights as is_unbookable,
-        calendar_nights * avg_nightly_price as window_asking_value
-    from windows
+    {%- set density_sql -%}
+select *
+from semantic_view(
+    {{ view }}
+    metrics
+        listing.listings,
+        listing.avg_achieved_rate,
+        listing.avg_list_price,
+        listing.avg_occupancy_rate,
+        listing.portfolio_revenue,
+        listing.avg_revenue_per_listing
+    dimensions listing.neighborhood
+    where not listing.is_orphan_listing
 )
+order by listings desc
     {%- endset -%}
 
-    {%- set portfolio_sql -%}
-{{ windows_cte }}
-
-select
-    count(*) as availability_windows,
-    count_if(is_unbookable) as unbookable_windows,
-    sum(case when is_unbookable then window_length_nights end)
-        as unbookable_nights,
-    round(sum(case when is_unbookable then window_asking_value end), 2)
-        as unbookable_asking_value,
-    sum(window_length_nights) as all_available_nights,
-    round(sum(window_asking_value), 2) as all_available_asking_value,
-    round(
-        100 * sum(case when is_unbookable then window_asking_value end)
-        / sum(window_asking_value),
-        2
-    ) as pct_of_open_inventory_unbookable
-from classified
-    {%- endset -%}
-
-    {%- set by_listing_sql -%}
-{{ windows_cte }}
-
-select
-    listing_id,
-    listing_name,
-    count(*) as availability_windows,
-    count_if(is_unbookable) as unbookable_windows,
-    max(minimum_nights) as strictest_minimum_nights,
-    sum(case when is_unbookable then window_length_nights end)
-        as unbookable_nights,
-    round(sum(case when is_unbookable then window_asking_value end), 2)
-        as unbookable_asking_value
-from classified
-group by all
-having count_if(is_unbookable) > 0
-order by unbookable_asking_value desc
-    {%- endset -%}
-
-    {%- set detail_sql -%}
-{{ windows_cte }}
-
-select
-    listing_id,
-    listing_name,
-    availability_window_seq,
-    window_length_nights,
-    minimum_nights,
-    round(window_asking_value, 2) as window_asking_value
-from classified
-where is_unbookable
-order by window_asking_value desc
+    {%- set density_by_room_type_sql -%}
+select *
+from semantic_view(
+    {{ view }}
+    metrics
+        listing.listings,
+        listing.avg_achieved_rate,
+        listing.avg_occupancy_rate
+    dimensions
+        listing.neighborhood,
+        listing.room_type
+    where not listing.is_orphan_listing
+)
+order by neighborhood, listings desc
     {%- endset -%}
 
     {{ return([
         {
             'name': 'q26_a',
-            'question': 'How much revenue is lost to availability windows that '
-                        ~ 'are too short to book?',
-            'sql': portfolio_sql,
+            'question': 'How does neighborhood supply density compare to the '
+                        ~ 'achieved rate?',
+            'sql': density_sql,
         },
         {
             'name': 'q26_b',
-            'question': 'How many open nights cannot be sold because the gap is '
-                        ~ 'shorter than the minimum stay?',
-            'sql': portfolio_sql,
+            'question': 'How many listings do we have in each neighborhood, '
+                        ~ 'and what do they earn per night?',
+            'sql': density_sql,
         },
         {
             'name': 'q26_c',
-            'question': 'What share of our open inventory is unbookable?',
-            'sql': portfolio_sql,
+            'question': 'Do neighborhoods with more listings have lower rates?',
+            'sql': density_sql,
         },
         {
             'name': 'q26_d',
-            'question': 'Which listings lose the most to unbookable gaps in '
-                        ~ 'their calendar?',
-            'sql': by_listing_sql,
-        },
-        {
-            'name': 'q26_e',
-            'question': 'Where should we lower the minimum-stay requirement?',
-            'sql': by_listing_sql,
-        },
-        {
-            'name': 'q26_f',
-            'question': 'List every availability window that is shorter than '
-                        ~ 'the minimum stay allowed',
-            'sql': detail_sql,
+            'question': 'Show supply and achieved rate by neighborhood and '
+                        ~ 'room type',
+            'sql': density_by_room_type_sql,
         },
     ]) }}
 {%- endmacro %}

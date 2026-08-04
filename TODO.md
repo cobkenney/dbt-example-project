@@ -1,11 +1,11 @@
 # TODO
 
-- [x] 1. Build semantic views — `marts/core_context_layer/`, four of them: one per grain of additive measure in `core_mart`, which is what stops a fan-out join from silently double-counting. Covers 27 of the 28 business questions (#28 needs a guest key). Materialized with `Snowflake-Labs/dbt_semantic_view`. Five verified figures from `analyses/` reproduced exactly through them; see that folder's README for the reconciliation and for what the syntax cannot express.
+- [x] 1. Build semantic views — `marts/core_context_layer/`, four of them: one per grain of additive measure in `core_mart`, which is what stops a fan-out join from silently double-counting. Covers all 26 business questions. Materialized with `Snowflake-Labs/dbt_semantic_view`. Five verified figures from `analyses/` reproduced exactly through them; see that folder's README for the reconciliation and for what the syntax cannot express.
 - [x] 2. Build a skill called wake-up-ae that opens a PR for new amenities or verification methods that trigger from test warning
 - [x] 3. Determine if a new amenity is common enough (> 5% of listings have it) to be added to the marts layer
 - [x] 4. Check whether any of the amenities columns are similar to each other
-- [x] 5. Figure out if we really need `availability_windows` — is `fct_listing_daily` enough to answer that question easily? **Yes it is.** Both dependent questions (#3 and #26 in `BUSINESS_QUESTIONS.md`) reproduce exactly from the daily fact, so the 2 models / 258 lines / 25 tests were collapsed into `analyses/03`. The clamp rule survives as `tests/assert_stay_cap_binds.sql`; see "Collapsed models" in `dbt/models/README.md`.
-- [x] 6. Think of 20 more business questions we could ask about this data — written up in `BUSINESS_QUESTIONS.md` (28 questions, plus the gaps the source data can't fill and the caveats that change answers)
+- [x] 5. Figure out if we really need `availability_windows` — is `fct_listing_daily` enough to answer that question easily? **Yes it is.** Both dependent questions (#3 and #25 in `BUSINESS_QUESTIONS.md`) reproduce exactly from the daily fact, so the 2 models / 258 lines / 25 tests were collapsed into `analyses/03`. The clamp rule survives as `tests/assert_stay_cap_binds.sql`; see "Collapsed models" in `dbt/models/README.md`.
+- [x] 6. Think of 20 more business questions we could ask about this data — written up in `BUSINESS_QUESTIONS.md` (26 questions, plus the gaps the source data can't fill and the caveats that change answers)
 - [x] 7. Review tests to ensure consistency
 - [x] 9. Join the READMEs in `models/` together — consolidated into `models/README.md`
 - [ ] 10. clean up all comments / docs / etc
@@ -15,9 +15,9 @@
 - [x] 13. build verified queries in semantic views — `AI_VERIFIED_QUERIES`, plan settled and the syntax probed against Snowflake; nothing written yet
 - [ ] 14. verify query / view outputs — a `run-operation` that executes every verified query and fails on error, since Snowflake accepts one referencing a table that does not exist (probed: `select no_such_column from no_such_table` created fine). Pin each result to the figure in `analyses/` where one exists, so a query that still runs but has quietly drifted is caught too.
 - [ ] 15. test skills / demonstrate example PR
-- [ ] 16. clean up tests (too many on models, some on sources for no reason, bespoke tests)
-- [ ] 17. clean up business questions
-- [ ] 18. clean up seeds
+- [x] 16. clean up tests (too many on models, some on sources for no reason, bespoke tests)
+- [x] 17. clean up business questions
+- [x] 18. clean up seeds
 - [ ] 19. review macros
 
 
@@ -55,3 +55,4 @@
   - similarity assessment of metrics
   - extend wake up ae to semantic view additions
   - other sources needed
+- [ ] 19. read every file

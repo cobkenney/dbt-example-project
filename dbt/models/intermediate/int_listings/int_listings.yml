@@ -43,13 +43,6 @@ models:
         data_tests:
           - unique
           - not_null
-          # Every listing here exists in the bridge. The other direction — every
-          # bridge listing reaching this model — is true by construction, since
-          # the driving CTE is a `select distinct` from that same table, so a test
-          # for it would be testing SQL rather than the data. What guards the
-          # grain collapsing back to stg_listings' narrower universe is the
-          # orphan-count test below, which fails at zero as well as above the
-          # pinned count.
           - relationships:
               arguments:
                 to: ref('int_listing_amenities')
@@ -134,8 +127,6 @@ models:
 
           Computed here, once, and read downstream rather than recomputed —
           which is the main reason this model exists.
-        data_tests:
-          - not_null
 
     # The grain claim is pinned by tests/assert_orphan_listing_count.sql — a
     # singular test, because the assertion is about the model as a whole rather

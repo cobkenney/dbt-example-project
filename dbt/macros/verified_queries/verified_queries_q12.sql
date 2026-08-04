@@ -11,7 +11,7 @@
     total_revenue by accommodates itself gets a division error or an infinity on
     any listing recording zero capacity; this metric returns NULL for it.
 
-    Note this is NOT the same normalization as question 22, which divides the
+    Note this is NOT the same normalization as question 21, which divides the
     nightly PRICE by bedrooms and beds in sem_listing_daily. Capacity is the
     clean denominator of the three - accommodates has no NULLs or zeros in this
     data, where bedrooms goes NULL on some listings and beds goes to 0 on others.

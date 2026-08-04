@@ -1,19 +1,21 @@
 {#
-    Verified queries for business question 23 — which reservations span a month
-    boundary, and therefore whether monthly revenue needs proration. Against
-    sem_reservations.
+    Verified queries for business question 23 — length-of-stay distribution by
+    neighborhood and room type. Against sem_reservations.
 
     Returns a list of {name, question, sql} entries. Several entries may share
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    spans_month_boundary is a derived dimension on the view, so the comparison
-    of last_night_date against check_in_month is made once here rather than
-    left to whoever asks. The count metric is month_boundary_reservations.
+    Two things these entries exist to pin:
 
-    Revenue is attributed entirely to the check-in month — these are the
-    reservations whose revenue would move if it were prorated, which is the
-    reason the question exists.
+    - The length measures come from avg_length_of_stay and
+      median_length_of_stay, which exclude the censored reservations by
+      construction. censored_reservations rides along so the reader can see how
+      much was dropped from each group.
+    - is_orphan_listing is filtered out. An orphan has no listings row, so
+      its neighborhood and room_type are NULL and it would otherwise show up as
+      an unnamed group. Filtering it is correct here because the question
+      compares attributes, and wrong for a revenue total.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.
@@ -22,72 +24,85 @@
 
     {%- set view = view or this -%}
 
-    {%- set count_sql -%}
-select *
-from semantic_view(
-    {{ view }}
-    metrics
-        reservations,
-        month_boundary_reservations,
-        total_revenue
-)
-    {%- endset -%}
-
-    {%- set by_month_sql -%}
-select *
-from semantic_view(
-    {{ view }}
-    metrics
-        reservations,
-        month_boundary_reservations,
-        total_revenue
-    dimensions check_in_month
-)
-order by check_in_month
-    {%- endset -%}
-
-    {%- set detail_sql -%}
+    {%- set by_neighborhood_sql -%}
 select *
 from semantic_view(
     {{ view }}
     metrics
         reservations,
         booked_nights,
-        total_revenue
-    dimensions
-        reservation_key,
-        listing_id,
-        check_in_date,
-        last_night_date,
-        check_in_month
-    where spans_month_boundary
+        avg_length_of_stay,
+        median_length_of_stay,
+        max_length_of_stay,
+        censored_reservations
+    dimensions neighborhood
+    where not is_orphan_listing
 )
-order by check_in_date
+order by avg_length_of_stay desc
+    {%- endset -%}
+
+    {%- set by_room_type_sql -%}
+select *
+from semantic_view(
+    {{ view }}
+    metrics
+        reservations,
+        booked_nights,
+        avg_length_of_stay,
+        median_length_of_stay,
+        max_length_of_stay,
+        censored_reservations
+    dimensions room_type
+    where not is_orphan_listing
+)
+order by avg_length_of_stay desc
+    {%- endset -%}
+
+    {%- set by_neighborhood_room_type_sql -%}
+select *
+from semantic_view(
+    {{ view }}
+    metrics
+        reservations,
+        avg_length_of_stay,
+        median_length_of_stay,
+        censored_reservations
+    dimensions
+        neighborhood,
+        room_type
+    where not is_orphan_listing
+)
+order by neighborhood, room_type
     {%- endset -%}
 
     {{ return([
         {
             'name': 'q23_a',
-            'question': 'How many reservations span a month boundary?',
-            'sql': count_sql,
+            'question': 'What is the length-of-stay distribution by '
+                        ~ 'neighborhood?',
+            'sql': by_neighborhood_sql,
         },
         {
             'name': 'q23_b',
-            'question': 'Do we need to prorate monthly revenue across '
-                        ~ 'reservations that cross a month boundary?',
-            'sql': count_sql,
+            'question': 'Which neighborhoods attract the longest stays?',
+            'sql': by_neighborhood_sql,
         },
         {
             'name': 'q23_c',
-            'question': 'How many bookings start in one month and end in '
-                        ~ 'another, by month?',
-            'sql': by_month_sql,
+            'question': 'What is the length-of-stay distribution by room '
+                        ~ 'type?',
+            'sql': by_room_type_sql,
         },
         {
             'name': 'q23_d',
-            'question': 'List the reservations that start in one month and '
-                        ~ 'end in another',
-            'sql': detail_sql,
+            'question': 'Do entire homes get longer stays than private rooms?',
+            'sql': by_room_type_sql,
+        },
+        {
+            'name': 'q23_e',
+            'question': 'Show average and median length of stay by '
+                        ~ 'neighborhood and room type',
+            'sql': by_neighborhood_room_type_sql,
         },
     ]) }}
 {%- endmacro %}

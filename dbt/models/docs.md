@@ -271,7 +271,7 @@ True on the first available night of a contiguous run of available nights, false
 everywhere else — including on every booked night.
 
 The building block of the availability-window questions (#3, longest possible
-stay; #26, revenue lost to unbookable windows), which need to group consecutive
+stay; #25, revenue lost to unbookable windows), which need to group consecutive
 available dates into runs. Reading a boolean column is what those queries do
 instead of writing the gap-and-island window function themselves.
 

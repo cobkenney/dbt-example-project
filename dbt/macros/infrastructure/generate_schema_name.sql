@@ -4,7 +4,7 @@
     mart (core_mart). The schema name comes from the `+schema:` config in
     dbt_project.yml.
 
-    dbt's built-in behaviour concatenates the profile schema with `+schema:`
+    dbt built-in behaviour concatenates the profile schema with `+schema:`
     (giving `dbt_ckenney_core_mart`), which is what we want in dev — one
     developer's build cannot clobber another's, or the shared tables analysts
     query. In prod we want the bare name, since that is what grants are

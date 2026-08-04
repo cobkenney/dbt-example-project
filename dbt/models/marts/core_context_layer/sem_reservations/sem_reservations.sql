@@ -7,7 +7,7 @@
 -- night it occupies and count it once per night. Snowflake returns that without
 -- complaint.
 --
--- Answers business questions 17, 23 and 24.
+-- Answers business questions 17, 22 and 23.
 --
 -- What this table cannot do, because it is derived from occupied calendar nights
 -- rather than from a bookings source: cancelled and never-confirmed bookings are
@@ -72,7 +72,7 @@ DIMENSIONS (
         COMMENT = 'First night of the stay.',
 
     reservation.last_night_date AS reservation.last_night_date
-        COMMENT = 'Final night occupied. Compare against check_in_month to find stays that cross a month boundary - question 23.',
+        COMMENT = 'Final night occupied. Compare against check_in_month to find stays that cross a month boundary - question 22.',
 
     reservation.check_out_date AS reservation.check_out_date
         WITH SYNONYMS = ('departure', 'end date')
@@ -85,7 +85,7 @@ DIMENSIONS (
     reservation.spans_month_boundary
         AS date_trunc('month', reservation.last_night_date)
         != reservation.check_in_month
-        COMMENT = 'True where the stay starts in one month and ends in another. Question 23 - these are the reservations whose revenue would need prorating if monthly revenue had to be exact.',
+        COMMENT = 'True where the stay starts in one month and ends in another. Question 22 - these are the reservations whose revenue would need prorating if monthly revenue had to be exact.',
 
     -- The filter that changes the answer, and the reason it is one column rather
     -- than two: either edge truncates a stay, so exposing left and right
@@ -107,7 +107,7 @@ DIMENSIONS (
 
     listing.neighborhood AS listing.neighborhood
         WITH SYNONYMS = ('area', 'district', 'location')
-        COMMENT = 'Listing neighborhood. For question 24, length-of-stay distribution by area.',
+        COMMENT = 'Listing neighborhood. For question 23, length-of-stay distribution by area.',
 
     listing.property_type AS listing.property_type
         COMMENT = 'Apartment, house, condominium and similar.',
@@ -191,7 +191,7 @@ METRICS (
 
     reservation.month_boundary_reservations
         AS count_if(reservation.spans_month_boundary)
-        COMMENT = 'How many reservations start in one month and end in another - question 23.',
+        COMMENT = 'How many reservations start in one month and end in another - question 22.',
 
     reservation.listings AS count(distinct reservation.listing_id)
         COMMENT = 'Distinct listings with at least one booking in the slice. FEWER than the total listing count - a few listings were never booked at all.',
@@ -213,4 +213,4 @@ AI_SQL_GENERATION 'Always use reservation_key as the reservation identifier, nev
     it runs, so these build green either way - the validator in TODO item 14 is
     what will make "verified" mean anything here.
 #}
-{{ ai_verified_queries(['q17', 'q23', 'q24']) }}
+{{ ai_verified_queries(['q17', 'q22', 'q23']) }}

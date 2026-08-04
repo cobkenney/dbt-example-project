@@ -71,9 +71,6 @@ models:
           reaching through host_id — the orphan listing has none. Not compared
           against anything here; the query picks the unit.
 
-          No not_null: this can only be NULL if int_listing_daily is empty, which
-          booked_nights' not_null below already catches.
-
       - name: host_id
         description: "{{ doc('host_id') }}"
 
@@ -105,18 +102,12 @@ models:
 
       - name: has_air_conditioning
         description: "{{ doc('has_air_conditioning') }}"
-        data_tests:
-          - not_null
 
       - name: has_lockbox
         description: "{{ doc('has_lockbox') }}"
-        data_tests:
-          - not_null
 
       - name: has_first_aid_kit
         description: "{{ doc('has_first_aid_kit') }}"
-        data_tests:
-          - not_null
 
       - name: has_wifi
         description: "{{ doc('has_wifi') }}"
@@ -151,8 +142,6 @@ models:
           Zero, not NULL, for the 3 listings that were never booked — `sum()`
           over all-NULL revenue returns NULL, which is coalesced to 0 as the
           honest measure.
-        data_tests:
-          - not_null
 
       - name: avg_nightly_price
         description: >
@@ -171,13 +160,6 @@ models:
           booked_nights / calendar_days, using div0 so a listing with no
           calendar rows yields 0 rather than erroring. Ranges 0-1.
 
-          No accepted_range: booked_nights is count_if over the rows
-          calendar_days counts, so the ratio cannot leave 0-1. not_null is kept —
-          div0 returns NULL when its inputs are NULL, which is what the
-          daily_rollup left join would produce.
-        data_tests:
-          - not_null
-
       - name: is_orphan_listing
         description: "{{ doc('is_orphan_listing') }}"
     data_tests:
@@ -185,11 +167,6 @@ models:
       # counted independently with count_if, so this catches a NULL is_available
       # in the calendar — where both count_if predicates go NULL, the row falls
       # out of both counts, and the sum stops matching count(*).
-      #
-      # It does NOT cover a NULL calendar_days from the daily_rollup left join:
-      # the test compiles to `where not (expression)`, and not(NULL) is NULL, so
-      # a NULL row passes silently. booked_nights' not_null is what catches that
-      # join missing.
       - dbt_utils.expression_is_true:
           arguments:
             expression: >

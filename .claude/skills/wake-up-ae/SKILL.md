@@ -26,14 +26,11 @@ warning green.** So a seed diff committed on its own leaves a column that no yml
 documents and no mart decision stands behind, with the tripwire silenced and
 nobody to notice. Every step below lands in **one commit**, or none of it does.
 
-Note the repo contradicts itself on ordering:
-[int_listing_amenities.yml](dbt/models/intermediate/int_listing_amenities/int_listing_amenities.yml#L64)
-says regenerate the seed last, while
-[generate_known_amenity_names_seed.sql](dbt/macros/generate_known_amenity_names_seed.sql#L27)
-says first. **The macro is right and the yml comment is stale** —
-`get_amenity_names()` reads the seed and `int_listing_daily` loops over its
-output, so nothing downstream exists until the seed carries the value. Follow the
-macro. Fixing that stale comment is a reasonable thing to offer while you are here.
+**Regenerate the seed FIRST.** `get_flag_values()` reads the seed and the pivot
+models loop over its output, so nothing downstream exists until the seed carries
+the value — and the yml generator in step 4 reads the seed too, so running it
+before the seed regenerates emits nothing at all. Every family follows this order;
+[generate_flag_seed.sql](dbt/macros/flags/generate_flag_seed.sql) documents it.
 
 ## 1. Detect
 
@@ -87,13 +84,13 @@ Three things to get right:
 Amenities:
 
 ```bash
-dbt --quiet run-operation generate_known_amenity_names_seed > seeds/known_amenity_names.csv
+dbt --quiet run-operation generate_flag_seed --args '{family: amenity}' > seeds/known_amenity_names.csv
 ```
 
 Verification methods:
 
 ```bash
-dbt --quiet run-operation generate_known_verification_methods_seed > seeds/known_verification_methods.csv
+dbt --quiet run-operation generate_flag_seed --args '{family: verification}' > seeds/known_verification_methods.csv
 ```
 
 `--quiet` is not optional and goes **before** `run-operation`. dbt writes its own
@@ -115,15 +112,15 @@ Two things the diff protects, both worth checking by eye:
 ## 4. Document the new flag
 
 ```bash
-dbt run-operation generate_amenity_flag_yml          # -> int_listing_daily.yml
-dbt run-operation generate_verification_flag_yml     # -> int_hosts.yml
+dbt run-operation generate_flag_yml --args '{family: amenity}'       # -> int_listing_daily.yml
+dbt run-operation generate_flag_yml --args '{family: verification}'  # -> int_hosts.yml
 ```
 
-Each prints a yml block for flags the data produces that the model's yml does not
-declare, plus a **stale** report naming declared flags the data no longer produces.
+Each prints a yml block for flags the seed produces that the model's yml does not
+declare, plus a **stale** report naming declared flags the seed no longer produces.
 Paste the block into that model's `columns:` block. Do not hand-write the flag
-name: it is `amenity_flag_name()` / `verification_flag_name()` slugification, and
-guessing at how the punctuation collapses is how a name gets committed wrong.
+name: it is `flag_name()` slugification, and guessing at how the punctuation
+collapses is how a name gets committed wrong.
 
 Note which model each targets — the flags live on the pivot models, not the bridges
 the tests fire on:

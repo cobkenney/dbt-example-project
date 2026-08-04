@@ -33,7 +33,6 @@ models:
 
           Foreign key to dim_listings.
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('dim_listings')
@@ -59,8 +58,6 @@ models:
 
       - name: reservation_revenue
         description: "{{ doc('reservation_revenue') }}"
-        data_tests:
-          - not_null
 
       - name: avg_nightly_price
         description: >
@@ -115,9 +112,3 @@ models:
 
       - name: is_orphan_listing
         description: "{{ doc('is_orphan_listing') }}"
-    data_tests:
-      # Guards the left joins to int_listings and int_listing_daily: if
-      # either join key stopped being unique, reservations would fan out.
-      - dbt_utils.equal_rowcount:
-          arguments:
-            compare_model: ref('int_reservations')

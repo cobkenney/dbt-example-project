@@ -1,7 +1,7 @@
 -- Host portfolios: who to invest in, and whether professional operators actually
 -- outperform. One row per host.
 --
--- Answers business questions 18, 19, 20 and 21.
+-- Answers business questions 18, 19 and 20.
 --
 -- WHY THIS IS NOT FOLDED INTO sem_listing_performance. Host revenue can be had
 -- by aggregating dim_listings grouped by host_id, so a fourth view looks like
@@ -206,7 +206,7 @@ METRICS (
 
     host.avg_verification_count AS avg(host.verification_count)
         WITH SYNONYMS = ('average verifications')
-        COMMENT = 'Mean number of verification methods completed. Question 21 - read the view COMMENT before putting an occupancy claim on it.',
+        COMMENT = 'Mean number of verification methods completed. Read the view COMMENT before putting an occupancy claim on it.',
 
     -- Named portfolio_* rather than reusing the fact names: facts and metrics
     -- share one namespace here, and Snowflake rejects a metric whose name
@@ -225,7 +225,7 @@ METRICS (
         COMMENT = 'How many hosts in the slice hold more than one listing. A small minority overall, so segment comparisons on it rest on a thin base.'
 )
 
-COMMENT = 'Rental host portfolios over a fixed one-year snapshot: portfolio size, tenure, verification status, and performance at one row per host. Covers only listings that have a listings row, so it holds fewer listings than the other views. Use this for which hosts to invest in, professional operators against casual ones, and whether tenure or verification tracks performance. Figures here are HOST-WEIGHTED - every host counts once whatever the portfolio size. For listing-weighted equivalents use SEM_LISTING_PERFORMANCE. IMPORTANT on trust signals, question 21: there is no finding here. Email and phone are held by every host, so their figures are just the overall average and cannot correlate with anything. The remaining spread is non-monotonic on tiny bases, and direction disagrees between measures - knowledge-based authentication has the highest review score and the lowest occupancy. There are more verification-method cells than there are hosts, so per-method figures rest on very few rows each. Read verification as ADOPTION and do not put an occupancy claim on a verification badge. Host tenure, question 20, has the same problem from the other side: host_since is tightly clustered, so there is almost no variance to explain performance with. A HOST REAL NAME CANNOT BE RETRIEVED - it is PII, masked before it reaches any of these models.'
+COMMENT = 'Rental host portfolios over a fixed one-year snapshot: portfolio size, tenure, verification status, and performance at one row per host. Covers only listings that have a listings row, so it holds fewer listings than the other views. Use this for which hosts to invest in, professional operators against casual ones, and whether tenure or verification tracks performance. Figures here are HOST-WEIGHTED - every host counts once whatever the portfolio size. For listing-weighted equivalents use SEM_LISTING_PERFORMANCE. IMPORTANT on trust signals: there is no finding here. Email and phone are held by every host, so their figures are just the overall average and cannot correlate with anything. The remaining spread is non-monotonic on tiny bases, and direction disagrees between measures - knowledge-based authentication has the highest review score and the lowest occupancy. There are more verification-method cells than there are hosts, so per-method figures rest on very few rows each. Read verification as ADOPTION and do not put an occupancy claim on a verification badge. Host tenure, question 20, has the same problem from the other side: host_since is tightly clustered, so there is almost no variance to explain performance with. A HOST REAL NAME CANNOT BE RETRIEVED - it is PII, masked before it reaches any of these models.'
 
 AI_SQL_GENERATION 'Compare hosts on avg_revenue_per_listing, never on portfolio_revenue or avg_revenue_per_host, both of which scale with portfolio size by construction. Figures here are host-weighted; if the question is really about listings, use SEM_LISTING_PERFORMANCE instead. Revenue here will NOT match the other views, because orphan listings have no host and their revenue is therefore absent - say so rather than presenting a reconciled total. Never attempt to return a host real name: only a salted hash exists, more than one host can share it, and it is not an identifier - use host_id. Tenure is anchored to the as_of_date column, so never use current_date. When asked whether verification predicts performance, report adoption counts and state plainly that the data does not support a causal or even a reliable correlational claim - and never build one on is_verified_email or is_verified_phone, which are true for every host.'
 
@@ -237,14 +237,14 @@ AI_SQL_GENERATION 'Compare hosts on avg_revenue_per_listing, never on portfolio_
     FACT - and Snowflake rejects FACTS and METRICS in one clause, so that one is
     CTE-wrapped at host grain. Reasoning is in the macro.
 
-    NO ENTRY FOR QUESTION 21, deliberately. Comparing the verification methods
+    NO VERIFIED QUERY COMPARES THE VERIFICATION METHODS, deliberately. Doing so
     needs one union branch per method, because each is its own boolean dimension
     with no single column to group on. Generating that from
-    get_verification_methods() also drags a stg_listings ref into this view,
-    which is the wrong dependency for a context layer built over core_mart. The
-    question has no finding to pin anyway - the view COMMENT and
-    AI_SQL_GENERATION already say to report verification as adoption and refuse
-    an occupancy claim, which is the guidance a client needs here.
+    get_flag_values('verification') also drags a seed ref into this view,
+    which is the wrong dependency for a context layer built over core_mart. There
+    is no finding to pin anyway - the view COMMENT and AI_SQL_GENERATION already
+    say to report verification as adoption and refuse an occupancy claim, which
+    is the guidance a client needs here.
 
     Not yet validated. Snowflake accepts a verified query without checking that
     it runs, so these build green either way - the validator in TODO item 14 is

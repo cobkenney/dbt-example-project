@@ -15,15 +15,3 @@ models:
       are what Cortex Analyst actually reads. This block is for `dbt docs`.
     config:
       tags: ['1x_day']
-
-    # No column-level docs and no data_tests. A semantic view exposes metrics
-    # and dimensions rather than columns, so dbt has no column list to attach
-    # tests to — `dbt test` cannot reach a metric. The grain, uniqueness and
-    # reconciliation tests all live on the underlying marts in core_mart, which
-    # is the right place for them: if fct_listing_daily is sound, this view
-    # cannot invent a wrong number, only expose it under a wrong name.
-    #
-    # What is NOT covered by that argument, and is worth knowing: nothing here
-    # asserts that a metric's SQL means what its COMMENT says. That is what the
-    # verified queries will do once they are added — each one pins a metric to a
-    # query whose result has been checked against the marts.

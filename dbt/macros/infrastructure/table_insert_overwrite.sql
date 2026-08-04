@@ -8,21 +8,12 @@
 
     `insert overwrite into ... select` instead replaces the *rows* while keeping
     the same object, so `at(offset => ...)` and `before(statement => ...)` still
-    reach the prior state. Verified on Snowflake: after an insert overwrite,
-    `at(offset => -5)` returns the pre-overwrite rows; after a create or
-    replace, the same query fails with "Time travel data is not available".
-
-    Snowflake runs the delete and insert as a single atomic transaction, so
-    readers never observe an empty table.
+    reach the prior state.
 
     IMPORTANT: `insert overwrite` matches columns by POSITION, not name, and
-    cannot change the table's shape. Both were confirmed against Snowflake —
-    a reversed select list raised a numeric conversion error rather than
-    reordering, and a select with an extra column failed to compile. So this
-    materialization compares the model's column signature to the existing
-    table's and falls back to `create or replace` when they differ. Without
-    that check, adding or reordering a column would either error or silently
-    load values into the wrong columns.
+    cannot change the tables shape. So this materialization compares the
+    models column signature to the existing tables and falls back to
+    `create or replace` when they differ.
 
     Falls back to `create or replace` when:
       - the table does not exist yet

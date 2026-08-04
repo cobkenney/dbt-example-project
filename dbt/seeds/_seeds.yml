@@ -15,7 +15,7 @@ seeds:
 
 
       2. `int_listing_daily` LOOPS OVER IT to generate one `has_*` flag column
-      per row, via `get_amenity_names()`. This file is therefore the model's
+      per row, via `get_flag_values('amenity')`. This file is therefore the model's
       column list. An amenity appearing or disappearing in the source cannot add
       or drop a column — only a commit to this file can, which is what makes a
       schema change reviewable rather than something that happens overnight.
@@ -23,12 +23,12 @@ seeds:
 
       Regenerate rather than hand-edit:
 
-          dbt --quiet run-operation generate_known_amenity_names_seed > seeds/known_amenity_names.csv
+          dbt --quiet run-operation generate_flag_seed --args '{family: amenity}' > seeds/known_amenity_names.csv
 
       That macro reads `int_listing_amenities` — the one place that still looks at
       the data — and emits the CSV. Because of job 2, running it is what ADDS THE
       COLUMN, so the same commit needs the yml entry
-      (`generate_amenity_flag_yml`) and the decision about whether the mart
+      (`generate_flag_yml`) and the decision about whether the mart
       carries the flag. A seed diff on its own means an undocumented column and a
       silenced warning.
 
@@ -78,12 +78,12 @@ seeds:
 
 
       2. `int_hosts` loops over it to generate one `is_verified_*` column per
-      row, via `get_verification_methods()`.
+      row, via `get_flag_values('verification')`.
 
 
       Regenerate rather than hand-edit:
 
-          dbt --quiet run-operation generate_known_verification_methods_seed > seeds/known_verification_methods.csv
+          dbt --quiet run-operation generate_flag_seed --args '{family: verification}' > seeds/known_verification_methods.csv
 
 
       A SEED even at this short a list, where `int_host_verifications.yml` used to
@@ -111,7 +111,7 @@ seeds:
           The method exactly as the source JSON array spells it. Every one is a
           lowercase snake_case identifier — no apostrophes, commas or quotes, so
           unlike the amenity names these need no CSV escaping. Case matters:
-          `verification_flag_name()` lowercases, so an upstream `Email` would
+          `flag_name()` lowercases, so an upstream `Email` would
           collide with `email` rather than produce a second flag, and the
           relationships test is what reports it.
         data_tests:

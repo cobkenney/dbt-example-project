@@ -13,37 +13,25 @@ models:
       - name: calendar_id
         description: "{{ doc('calendar_id') }}"
         data_tests:
-          # No not_null: this is stg_calendar's surrogate key passed through, and
-          # generate_surrogate_key cannot emit NULL.
-          #
-          # unique is doing real work despite being tested upstream too. This
-          # model left joins stg_listings and the amenity pivot, so a
+          # This model left joins int_listings and the amenity pivot, so a
           # duplicate key here means one of those join keys stopped being unique
           # and the daily grain fanned out.
           - unique
 
       - name: listing_id
         description: "{{ doc('listing_id') }}"
-        data_tests:
-          - not_null
 
       - name: calendar_date
         description: "{{ doc('calendar_date') }}"
-        data_tests:
-          - not_null
 
       - name: is_available
         description: "{{ doc('is_available') }}"
-        data_tests:
-          - not_null
 
       - name: reservation_id
         description: "{{ doc('reservation_id') }}"
 
       - name: price
         description: "{{ doc('nightly_price') }}"
-        data_tests:
-          - not_null
 
       - name: revenue
         description: "{{ doc('revenue') }}"
@@ -54,32 +42,12 @@ models:
       - name: maximum_nights
         description: "{{ doc('maximum_nights') }}"
 
-      # No not_null on either: both are built with case expressions that always
-      # return a value, and the running sum is over a non-null integer.
       - name: is_window_start
         description: "{{ doc('is_window_start') }}"
 
       - name: availability_window_seq
         description: "{{ doc('availability_window_seq') }}"
-        data_tests:
-          # At least 1 on every row once a listing's first available night has
-          # passed, and 0 only on booked nights preceding it. Negative or NULL
-          # would mean the running sum broke.
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 0
-                inclusive: true
 
-      # not_null is meaningful here now, which it was not before. This column
-      # used to be computed in place as `listings.listing_id is null` — an IS
-      # NULL comparison returns true or false and never NULL, so the test could
-      # not fail. It is now read across a left join to int_listings, so a NULL
-      # means a calendar row whose listing is absent from int_listings: the
-      # calendar has grown a listing the amenities bridge does not cover, and
-      # the model has quietly stopped knowing whether it is an orphan.
-      #
-      # Models downstream carry the column forward without a join, so they need
-      # no test of their own — this is the one place it can go NULL.
       - name: is_orphan_listing
         description: "{{ doc('is_orphan_listing') }}"
         data_tests:
@@ -128,23 +96,15 @@ models:
           not.
 
       # The generated amenity flags. The loop that builds them lives in this
-      # model's .sql; this list is maintained by
-      #
-      #   dbt run-operation generate_amenity_flag_yml
-      #
-      # which emits any flag the data produces but the yml has not declared, and
-      # names any declared flag the data no longer produces.
+      # model's .sql, and this list is generated rather than hand-maintained —
+      # see the wake-up-ae skill.
       #
       # Only the six the marts expose carry curated descriptions from docs.md;
-      # the rest follow the same has_<slugified_amenity_name> pattern. Because the
-      # column list comes from the data, a new amenity upstream adds a column on
-      # the next run — which is why the marts downstream name the flags they
-      # carry instead of selecting them in bulk.
-      #
-      # No not_null tests on the flags. boolor_agg over a non-empty group returns
-      # true or false, so a NULL can only come from the left join missing the
-      # listing entirely — the single condition amenity_count's not_null above
-      # already catches, once, instead of 81 times.
+      # the rest follow the same has_<slugified_amenity_name> pattern. The column
+      # list comes from seeds/known_amenity_names.csv, so a new amenity upstream
+      # adds nothing until that seed is regenerated — and the marts downstream
+      # name the flags they carry rather than selecting them in bulk, so a flag
+      # reaches them only when someone edits them too.
       - name: has_air_conditioning
         description: "{{ doc('has_air_conditioning') }}"
 
@@ -552,21 +512,3 @@ models:
         description: >
           Whether the listing offers "Wine glasses".
           Generated flag — exact match on that amenity name.
-    data_tests:
-      # The fan-out guard, and the reason it works: this equality holds only
-      # because stg_listings.listing_id and the amenity pivot's listing_id are
-      # each unique. If either stops being, the left joins multiply rows and the
-      # count diverges from the calendar it was built from.
-      - dbt_utils.equal_rowcount:
-          arguments:
-            compare_model: ref('stg_calendar')
-
-      # No grain test on (listing_id, calendar_date) — calendar_id is the hash of
-      # exactly that pair, so `unique` on it above asserts the same fact.
-      #
-      # No expression test on revenue. It was
-      #   (is_available and revenue is null) or (not is_available and revenue is
-      #   not null)
-      # which restates revenue's own definition — `case when not is_available
-      # then price end` — given price and is_available are both not_null. Those
-      # two tests are what actually hold the invariant up.

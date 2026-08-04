@@ -760,14 +760,13 @@ header.
 
 | View | Measure table (grain) | Dimension-only | Questions |
 |---|---|---|---|
-| `sem_listing_daily` | `fct_listing_daily` — listing × date | `dim_listings`, `dim_hosts` | 1, 2, 3, 6, 10, 15, 16, 22, 26, 27 |
-| `sem_reservations` | `fct_reservations` — listing × reservation | `dim_listings`, `dim_hosts` | 17, 23, 24 |
-| `sem_listing_performance` | `dim_listings` — listing, lifetime | `dim_hosts` | 4, 5, 7, 8, 9, 11, 12, 13, 14, 25 |
-| `sem_host_performance` | `dim_hosts` — host, lifetime | — | 18, 19, 20, 21 |
+| `sem_listing_daily` | `fct_listing_daily` — listing × date | `dim_listings`, `dim_hosts` | 1, 2, 3, 6, 10, 15, 16, 21, 25, 26 |
+| `sem_reservations` | `fct_reservations` — listing × reservation | `dim_listings`, `dim_hosts` | 17, 22, 23 |
+| `sem_listing_performance` | `dim_listings` — listing, lifetime | `dim_hosts` | 4, 5, 7, 8, 9, 11, 12, 13, 14, 24 |
+| `sem_host_performance` | `dim_hosts` — host, lifetime | — | 18, 19, 20 |
 
-That covers 27 of the 28 questions in
-[BUSINESS_QUESTIONS.md](../../BUSINESS_QUESTIONS.md); only #28 (repeat bookings)
-is out, for lack of a guest key in the source.
+That covers every one of the 26 questions in
+[BUSINESS_QUESTIONS.md](../../BUSINESS_QUESTIONS.md).
 
 **The split is verified, not asserted.** Asking `sem_listing_daily` for
 `listing.total_revenue` by month fails to compile — that metric does not exist in
@@ -787,7 +786,7 @@ presenting a false reconciliation.
 
 ## What semantic views cannot express
 
-- **Window functions**, so questions 3 and 26 (gap-and-island over availability
+- **Window functions**, so questions 3 and 25 (gap-and-island over availability
   runs) cannot be a plain `SEMANTIC_VIEW(...)` query. They work CTE-wrapped.
 
   **This limitation moved a column upstream.** The gap-and-island now lives on
@@ -832,9 +831,9 @@ been checked against the marts. All four views carry them.
 
 | View | Questions | Entries |
 |---|---|---|
-| `sem_listing_daily` | 1, 2, 3, 6, 10, 15, 16, 22, 26 | 46 |
-| `sem_listing_performance` | 4, 5, 7, 8, 9, 11, 12, 13, 14, 25, 27 | 47 |
-| `sem_reservations` | 17, 23, 24 | 14 |
+| `sem_listing_daily` | 1, 2, 3, 6, 10, 15, 16, 21, 25 | 46 |
+| `sem_listing_performance` | 4, 5, 7, 8, 9, 11, 12, 13, 14, 24, 26 | 47 |
+| `sem_reservations` | 17, 22, 23 | 14 |
 | `sem_host_performance` | 18, 19, 20 | 13 |
 
 Entries outnumber queries because several phrasings share one query — `QUESTION`
@@ -849,11 +848,12 @@ line. Entry names stay `q17_a`, `q17_b` so they trace back to
 way it is — which is where the CTE wraps and the orphan-filter decisions are
 argued.
 
-**Question 21 has no entries**, alone among the 27. Trust-signal adoption needs a
-row per verification method, and the methods are only enumerable from
-`stg_listings` — a `ref()` out of `core_mart`, which this layer does not take.
-The question also has no finding to pin: 36 hosts against 11 methods is too few
-to conclude from. That view's `COMMENT` and `AI_SQL_GENERATION` say so instead.
+Every question has entries. **Trust-signal adoption is deliberately not among
+them**: comparing verification methods needs a row per method, and the methods
+are only enumerable from `stg_listings` — a `ref()` out of `core_mart`, which
+this layer does not take. There is no finding to pin either, with 36 hosts
+against 11 methods. `sem_host_performance`'s `COMMENT` and `AI_SQL_GENERATION`
+carry that guidance instead.
 
 **Not yet validated** — TODO item 14.
 
@@ -1065,7 +1065,7 @@ were re-derived from `fct_listing_daily` and matched the mart exactly:
 | Question | Via the mart | Via `fct_listing_daily` |
 |---|---|---|
 | #3 longest stay, lockbox + first aid kit | 1303261 → 159 nights | 1303261 → 159 nights |
-| #26 unbookable windows | 204 windows, 59 unbookable, 300 nights | 204 / 59 / 300 |
+| #25 unbookable windows | 204 windows, 59 unbookable, 300 nights | 204 / 59 / 300 |
 
 So the models were never load-bearing for correctness — nothing was answerable
 only through them. The gap-and-island itself is 8 lines, and the reservations
@@ -1087,7 +1087,7 @@ honest cost of collapsing a model into an analysis.
 **One of the three came back, as a column.** `is_window_start` and
 `availability_window_seq` on `int_listing_daily`, carried through
 `fct_listing_daily`. The semantic layer is what changed the arithmetic: a
-semantic view cannot express a window function at all, so questions 3 and 26 as
+semantic view cannot express a window function at all, so questions 3 and 25 as
 verified queries would have restated the gap-and-island in a string literal that
 nothing validates — on top of the analysis and the cap test that already had it.
 Four copies of an 8-line window function is a different trade than one.
@@ -1103,7 +1103,7 @@ no duplicate dates.
 
 What it does **not** buy is a shorter answer to either question. `count(*)` and
 `least(window, cap)` still live in the consumer, and "longest window per listing"
-is still a two-level aggregation, so questions 3 and 26 remain CTE-wrapped as
+is still a two-level aggregation, so questions 3 and 25 remain CTE-wrapped as
 verified queries. Only the least dangerous of the three rules was retired.
 
 **The general shape.** A model earns its place by encoding a rule used in more

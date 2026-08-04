@@ -13,7 +13,7 @@
 -- additive measure per view makes that impossible to write rather than merely
 -- documented.
 --
--- Answers business questions 1, 2, 3, 6, 10, 15, 16, 22 and 26 — see
+-- Answers business questions 1, 2, 3, 6, 10, 15, 16, 21 and 25 — see
 -- BUSINESS_QUESTIONS.md.
 --
 -- COMMENT text carries the caveats because Cortex Analyst reads it to choose
@@ -63,7 +63,7 @@ FACTS (
     daily.maximum_nights AS daily.maximum_nights
         COMMENT = 'Longest stay the host will accept on this date. Caps how much of an availability window can be sold as one stay.',
 
-    -- Question 22. Both denominators are guarded and they fail in opposite
+    -- Question 21. Both denominators are guarded and they fail in opposite
     -- ways, which is why neither is a fallback for the other.
     daily.price_per_bedroom AS daily.price / nullif(daily.bedrooms, 0)
         COMMENT = 'Nightly price divided by bedrooms. bedrooms goes NULL on some listings, all of them entire homes, so those rows drop out rather than counting as zero.',
@@ -109,7 +109,7 @@ DIMENSIONS (
     daily.reservation_id AS daily.reservation_id
         COMMENT = 'Booking occupying this date, NULL when available. NOT unique on its own - the same id can cover two separate stays on different listings. Count reservations in sem_reservations, not here.',
 
-    -- Questions 3 and 26, and the only reason they are answerable here. A
+    -- Questions 3 and 25, and the only reason they are answerable here. A
     -- semantic view cannot express a window function, so the gap-and-island
     -- that identifies a contiguous availability run is precomputed on
     -- fct_listing_daily and grouped on as an ordinary key.
@@ -224,7 +224,7 @@ METRICS (
 
     daily.listings AS count(distinct daily.listing_id)
         WITH SYNONYMS = ('listing count', 'properties', 'supply')
-        COMMENT = 'Distinct listings in the slice. Grouped by neighborhood this is supply density, question 27, which needed a new model before this view existed.',
+        COMMENT = 'Distinct listings in the slice. Grouped by neighborhood this is supply density, question 26, which needed a new model before this view existed.',
 
     daily.hosts AS count(distinct daily.host_id)
         COMMENT = 'Distinct hosts in the slice. Excludes orphan listings, whose host_id is NULL.',
@@ -253,7 +253,7 @@ METRICS (
         COMMENT = 'Longest stay any listing in the slice will accept. For question 3, the cap that clamps an availability window.',
 
     daily.max_minimum_nights AS max(daily.minimum_nights)
-        COMMENT = 'Strictest minimum-stay requirement in the slice. For question 26: an availability window shorter than this cannot be sold as a single stay at all. The strictest rather than the mean, because a stay covering the run has to clear the requirement on every night of it.'
+        COMMENT = 'Strictest minimum-stay requirement in the slice. For question 25: an availability window shorter than this cannot be sold as a single stay at all. The strictest rather than the mean, because a stay covering the run has to clear the requirement on every night of it.'
 )
 
 COMMENT = 'Nightly economics for rental listings: revenue, pricing, occupancy and availability at listing x date grain over a fixed one-year snapshot. Use this for anything about a specific date, month, day of week, or price over time. For lifetime per-listing measures use SEM_LISTING_PERFORMANCE, for booking counts and length of stay use SEM_RESERVATIONS, for host portfolios use SEM_HOST_PERFORMANCE.'
@@ -274,7 +274,7 @@ AI_SQL_GENERATION 'The calendar is a fixed snapshot, not a rolling window. NEVER
     but they no longer restate the window function. See models/README.md,
     "Collapsed models".
 
-    The other CTE wraps are the familiar two reasons. Questions 16 and 22 band or
+    The other CTE wraps are the familiar two reasons. Questions 16 and 21 band or
     count over FACTS - minimum_nights, price_per_bedroom - and Snowflake rejects
     FACTS and METRICS in one clause. Questions 1, 2, 10 and 15 wrap to do
     something outside the clause that no semantic view can do: a within-partition
@@ -291,5 +291,5 @@ AI_SQL_GENERATION 'The calendar is a fixed snapshot, not a rolling window. NEVER
 #}
 {{ ai_verified_queries([
     'q01', 'q02', 'q03', 'q06', 'q10',
-    'q15', 'q16', 'q22', 'q26',
+    'q15', 'q16', 'q21', 'q25',
 ]) }}

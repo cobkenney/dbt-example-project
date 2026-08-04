@@ -11,8 +11,7 @@
 
     * The salt is what makes it irreversible. Host names are first names from a
       space of maybe a few thousand candidates, so an UNSALTED sha2('Maria') is
-      recovered instantly by hashing a name list and matching. A secret salt
-      defeats that; without it, this macro would be theatre.
+      recovered instantly by hashing a name list and matching.
 
     * Truncation to 16 chars keeps the column readable in a SQL client. 64 bits
       still makes collisions negligible at this cardinality, and the point is

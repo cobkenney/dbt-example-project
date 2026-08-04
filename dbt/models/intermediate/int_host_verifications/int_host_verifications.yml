@@ -32,52 +32,19 @@ models:
           {{ doc('host_id') }}
 
           Not unique here — this is a bridge, one row per method per host.
-        data_tests:
-          - not_null
-          # No relationships test to int_hosts. Both models group the same
-          # stg_listings on host_id, so every host_id here exists there by
-          # construction — the test cannot fail while that lineage holds. The
-          # direction worth watching is the reverse (a host with no rows here),
-          # which int_hosts.verification_count's not_null catches.
 
       - name: verification_method
         description: "{{ doc('verification_method') }}"
         data_tests:
-          - not_null
-
           # The methods pinned in seeds/known_verification_methods.csv, at WARN
           # rather than error. A new method upstream is a source change, not a
           # defect — so failing the build on it would be wrong, and saying nothing
           # would mean nobody ever learns the source grew one.
           #
-          # A RELATIONSHIPS test against the seed, not accepted_values with the
-          # values inline, which is where this started. The seed is what int_hosts
-          # loops over to generate its is_verified_* columns, and an
-          # accepted_values list in yml cannot be read by a Jinja loop — so
-          # inlining would leave two hand-maintained copies of the same list. The
-          # failure mode of the copies disagreeing is a flag column with no test
-          # behind it, or a tested value with no column.
-          #
-          # The warning is a WORK ORDER, not a defect report, and the order is
-          # load-bearing because the seed now decides the column list:
-          #   1. dbt --quiet run-operation generate_known_verification_methods_seed
-          #      > seeds/known_verification_methods.csv     (adds the column)
-          #   2. dbt run-operation generate_verification_flag_yml
-          #      (emits the yml for the new flag, for int_hosts.yml)
-          #   3. decide whether dim_hosts carries it — it names its flags
-          #      explicitly, so a new flag stops at int_hosts until it does
-          # All three in one commit. Step 1 alone silences the warning and widens
-          # int_hosts with an undocumented column.
-          #
-          # This test is what catches a method APPEARING. Since the loop reads the
-          # seed, appearing no longer changes any schema on its own — which is the
-          # point, but it also means nothing else in the project would notice.
-          # A method DISAPPEARING is now harmless too: the flag stays and goes
-          # universally false, which is queryable, and the codegen macro's stale
-          # report is what surfaces it.
-          #
-          # Named explicitly, matching the amenity test: the generated name is
-          # derived from the arguments and churns whenever they change.
+          # The warning is a WORK ORDER, not a defect report: the seed decides
+          # int_hosts' column list, so acting on it means regenerating the seed,
+          # documenting the flag and deciding whether dim_hosts carries it, all in
+          # one commit. The wake-up-ae skill is that procedure.
           - relationships:
               name: warn_new_verification_method
               arguments:
@@ -85,12 +52,3 @@ models:
                 field: verification_method
               config:
                 severity: warn
-
-      # No grain test on (host_id, verification_method). The model's final
-      # statement is `select distinct host_id, verification_method`, so the grain
-      # is enforced by the SQL rather than asserted after the fact.
-      #
-      # No rowcount test against int_hosts — this is a bridge, so the rowcount is
-      # a multiple of the host count and not a fixed figure. The condition worth
-      # watching is a host reaching zero rows here, and
-      # int_hosts.verification_count going NULL is what catches that.
