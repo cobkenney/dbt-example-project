@@ -9,37 +9,9 @@ models:
       Measures belong to the daily fact only. `dim_listings` and `dim_hosts`
       join in as attribute sources, and their lifetime measures are
       deliberately absent — see the model header.
-
-      Note that this description does not reach Snowflake. `persist_docs` is
-      unsupported for semantic views, so the `COMMENT` clauses inside the DDL
-      are what Cortex Analyst actually reads. This block is for `dbt docs`.
     config:
       tags: ['1x_day']
 
-    # NO COLUMN DOCS, AND THE ONLY TEST IS THE ONE BELOW.
-    #
-    # A semantic view exposes metrics and dimensions rather than columns, so
-    # there is nothing for a generic test to attach to — `unique` or `not_null`
-    # cannot reach a metric. Grain and reconciliation tests live on the
-    # underlying marts, which is the right place: if fct_listing_daily is sound,
-    # a view over it cannot invent a wrong number, only expose one under a wrong
-    # name.
-    #
-    # verified_queries_run is the exception because it tests something no mart
-    # test can see. Snowflake DOES NOT VALIDATE verified-query SQL at create
-    # time — a query naming a nonexistent column in a nonexistent table is
-    # accepted and the CREATE succeeds. So a query that has rotted builds green
-    # and surfaces only when a client serves it to somebody as a correct answer.
-    # This runs each one and fails if it returns no rows. The test itself is
-    # tests/generic/verified_queries_run.sql.
-    #
-    # WHAT IT CANNOT PROVE: that the figures are right. A query can parse, run,
-    # return rows, and still answer the wrong question.
-    #
-    # One declaration per question rather than one test taking a list, so a
-    # failure names the question in the test name and the other 8 still run.
-    # Keep this list in step with the ai_verified_queries([...]) call in the
-    # model — the same names, since both resolve through verified_queries_for().
     data_tests:
       - verified_queries_run:
           arguments:

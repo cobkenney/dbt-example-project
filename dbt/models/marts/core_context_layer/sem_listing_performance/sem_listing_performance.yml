@@ -6,19 +6,6 @@ models:
       Snowflake semantic view over `dim_listings`: lifetime revenue, occupancy,
       pricing against the advertised rate, reviews and amenities, at one row per
       listing.
-
-      The cross-sectional view — for comparing listings and segments against each
-      other rather than over time. Measures are listing-weighted; the
-      host-weighted equivalents live in `sem_host_performance`.
-
-      Question 7 (revenue concentration) has no metric here on purpose: it needs
-      a window function, which a semantic view cannot express. Question 27
-      (neighborhood supply density) needs no new model now that
-      `count(distinct listing_id)` by neighborhood is a metric.
-
-      Descriptions here do not reach Snowflake; the `COMMENT` clauses in the DDL
-      do. See `sem_listing_daily.yml` for why there are no column docs, and why
-      `verified_queries_run` is the one test these views carry.
     config:
       tags: ['1x_day']
 

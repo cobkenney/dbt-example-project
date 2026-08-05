@@ -4,12 +4,7 @@ models:
   - name: fct_reservations
     description: >
       One row per reservation, with listing attributes and amenity flags
-      denormalized on. Answers how many reservations we had, average length of
-      stay, average booking value, and bookings per month.
-
-      Derived from occupied calendar nights rather than a reservations source,
-      so it covers confirmed stays only — cancellations, unconfirmed requests,
-      and booking lead time are not answerable from this table.
+      denormalized on.
     config:
       tags: ['1x_day']
     columns:

@@ -6,23 +6,6 @@ models:
       Snowflake semantic view over `dim_hosts`: portfolio size, tenure,
       verification status and performance at one row per host.
 
-      The only view with no `RELATIONSHIPS` clause — one logical table, nothing
-      to join. Adding `dim_listings` would let a host measure be summed across
-      the listing join, double-counting every host who holds more than one
-      listing.
-
-      Figures here are host-weighted; `sem_listing_performance` is the
-      listing-weighted counterpart. The two give different answers to "host
-      occupancy" — and both are correct for their own question, which is why both
-      exist rather than one being derived.
-
-      Revenue here is short of the other three views by the orphan listings'
-      revenue, which has no host row to attribute it to. The view COMMENT says
-      so.
-
-      Descriptions here do not reach Snowflake; the `COMMENT` clauses in the DDL
-      do. See `sem_listing_daily.yml` for why there are no column docs, and why
-      `verified_queries_run` is the one test these views carry.
     config:
       tags: ['1x_day']
 

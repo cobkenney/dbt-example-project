@@ -1,20 +1,3 @@
--- Lifetime performance per listing: which properties earn, which sit empty, and
--- what attributes go with either. One row per listing.
---
--- The measure table is dim_listings, whose measures are already aggregated over
--- the full year. That is what this view is for and why it is separate from
--- sem_listing_daily: a cross-sectional comparison at listing grain, where the
--- daily view would make the same question an aggregation over every
--- listing-night and invite grouping a lifetime measure by date.
---
--- Answers business questions 4, 5, 7, 8, 9, 11, 12, 13, 14, 24 and 26.
---
--- The full amenity set is here rather than the three the daily fact carries, so
--- question 14 (which amenities go with higher achieved rates) can reach every
--- flag dim_listings exposes. That comparison is CROSS-SECTIONAL only, and the
--- view COMMENT says so: every amenity changelog event predates the calendar
--- window, so there is no before/after period inside the fact window and no
--- causal read is available at any modelling effort.
 {{ config(materialized='semantic_view') }}
 
 TABLES (
@@ -69,12 +52,10 @@ FACTS (
         WITH SYNONYMS = ('rating', 'review score')
         COMMENT = 'Average review score. NULL for listings with no reviews.',
 
-    -- Question 12.
     listing.revenue_per_guest
         AS listing.total_revenue / nullif(listing.accommodates, 0)
         COMMENT = 'Lifetime revenue divided by guest capacity. Normalizes a studio against a 6-sleeper - question 12.',
 
-    -- Question 8. The gap, not the two prices, is the answer.
     listing.achieved_nightly_rate
         AS listing.total_revenue / nullif(listing.booked_nights, 0)
         COMMENT = 'Revenue divided by nights actually sold - the rate the listing EARNED. NULL for listings never booked.',
@@ -84,7 +65,6 @@ FACTS (
         - (listing.total_revenue / nullif(listing.booked_nights, 0))
         COMMENT = 'Advertised rate minus achieved rate, in dollars. Question 8 - a large positive gap is weak discounting discipline, and a negative one means the listing earned above its ask.',
 
-    -- Question 24. Anchored to as_of_date, never current_date.
     listing.days_since_last_review
         AS datediff(day, listing.last_review_date, listing.as_of_date)
         WITH SYNONYMS = ('review recency', 'staleness')
@@ -150,9 +130,6 @@ DIMENSIONS (
     listing.is_orphan_listing AS listing.is_orphan_listing
         COMMENT = 'True for a listing the calendar references that has no listings row, so every descriptive column is NULL. Filter it out when comparing attributes - it would otherwise form a NULL group. LEAVE IT IN when totalling revenue, since it carries real booked revenue.',
 
-    -- Every flag dim_listings exposes, for question 14. The daily fact carries
-    -- only three; int_listing_amenities has the full set if a question needs an
-    -- amenity with no column here.
     listing.has_air_conditioning AS listing.has_air_conditioning
         WITH SYNONYMS = ('ac', 'air con')
         COMMENT = 'True where the listing offers air conditioning.',
@@ -213,21 +190,6 @@ METRICS (
     listing.max_revenue AS max(listing.total_revenue)
         COMMENT = 'Highest lifetime revenue in the slice.',
 
-    -- Question 7 (revenue concentration, the share from the top handful of
-    -- listings) has NO metric
-    -- here on purpose. It needs a rank or a window function, which a semantic
-    -- view cannot express, and a metric that quietly returned something else
-    -- would be reported as the answer. Group portfolio_revenue by listing_id and
-    -- rank outside the view — a CTE wrapping SEMANTIC_VIEW(...) is allowed, and
-    -- that is how the eventual verified query for it will be written.
-
-    -- Both weightings are named, but at THIS grain they coincide: verified
-    -- identical on every room type, because calendar_days is the same for every
-    -- listing, so the night-weighted denominator is a constant multiple of the
-    -- listing count. They diverge in sem_host_performance, where portfolio sizes
-    -- differ. Kept as a pair anyway, so a query written against either view
-    -- means the same thing by name, and so the equality here stops holding
-    -- visibly if the snapshot ever covers listings for unequal windows.
     listing.avg_occupancy_rate AS avg(listing.occupancy_rate)
         WITH SYNONYMS = ('occupancy', 'average occupancy')
         COMMENT = 'Mean of the per-listing occupancy rate. LISTING-weighted: every listing counts equally. Use this to compare neighborhoods or room types, which is question 4. Equal to occupancy_rate_weighted on this data, since every listing covers the same number of calendar nights.',
@@ -283,25 +245,6 @@ COMMENT = 'Lifetime performance per rental listing over a fixed one-year snapsho
 
 AI_SQL_GENERATION 'Measures here are already lifetime totals per listing, so never multiply them by a night count or group them by a date. For recency and staleness use days_since_last_review or months_since_last_review, which anchor to as_of_date - NEVER use current_date, because the snapshot is a fixed window and current_date makes the answer drift on every run. Distinguish a NULL last_review_date, meaning never reviewed, from a large staleness value, meaning reviewed long ago. When comparing descriptive attributes filter is_orphan_listing to false, since an orphan has NULL attributes and would form a NULL group; when totalling revenue leave it in. For occupancy pick deliberately: avg_occupancy_rate is listing-weighted and right for comparing segments, occupancy_rate_weighted is night-weighted and right for a portfolio total. Never present an amenity-to-revenue relationship as causal.'
 
-{#
-    Verified queries for the eleven questions this view answers. The entries live
-    in macros/verified_queries/, one macro per question.
-
-    Three shapes in here. Most group on dimensions and are plain
-    SEMANTIC_VIEW(...) queries. Questions 9, 11, 14 and 24 band a FACT -
-    list_price, review score, amenity count, staleness - and Snowflake rejects
-    FACTS and METRICS in one clause, so those are CTE-wrapped at listing grain.
-    Question 7 is CTE-wrapped for a different reason: revenue concentration needs
-    a window function, which is why it has no metric here at all.
-
-    The names are table-qualified - listing.avg_occupancy_rate rather than
-    avg_occupancy_rate - because this view exposes dimensions from both logical
-    tables and the qualified form is what Snowflake documents.
-
-    Not yet validated. Snowflake accepts a verified query without checking that
-    it runs, so these build green either way - the validator in TODO item 14 is
-    what will make "verified" mean anything here.
-#}
 {{ ai_verified_queries([
     'q04', 'q05', 'q07', 'q08', 'q09',
     'q11', 'q12', 'q13', 'q14', 'q24', 'q26',

@@ -1,20 +1,3 @@
--- One row per reservation, carrying listing attributes so stay-length and
--- booking-value questions need no join.
---
--- This should most likely come from a source, but in the absence of a source,
--- we will use listings. This most likely means we are missing unconfirmed
--- reservations vs the reservations on listings are confirmed. A reservations
--- model would be key to this mart for understanding easily things like how many
--- reservations did we have, what is the avg length of stay, etc.
---
--- What that costs, stated plainly for anyone reporting off this table:
---   * A reservation exists here only because a night is occupied, so requested-
---     but-never-confirmed and cancelled bookings are invisible. Booking
---     conversion and cancellation rate cannot be measured from this table.
---   * There is no booking-created timestamp anywhere in the raw data, so
---     booking lead time and booking pace are also out of reach.
---   * A date the host blocked for themselves is indistinguishable from a
---     booked night except by reservation_id being populated.
 with reservations as (
 
     select * from {{ ref('int_reservations') }}
@@ -55,36 +38,25 @@ amenities as (
 )
 
 select
-    -- The primary key, not reservation_id — that column is not unique on its
-    -- own, since the same id can cover separate stays on different listings.
+
     reservations.reservation_key,
     reservations.reservation_id,
     reservations.listing_id,
-
     reservations.check_in_date,
     reservations.last_night_date,
     reservations.check_out_date,
-
-    -- Precomputed for the same reason fct_listing_daily precomputes it: every
-    -- bookings-per-month query needs it, and date_trunc inside a group by is
-    -- easy to get subtly wrong. Keyed on check-in, so a stay spanning a month
-    -- boundary counts in the month it started.
     date_trunc('month', reservations.check_in_date)::date as check_in_month,
-
     reservations.nights,
     reservations.reservation_revenue,
     reservations.avg_nightly_price,
-
     reservations.is_contiguous,
     reservations.is_left_censored,
     reservations.is_right_censored,
-
     -- One flag to filter on before averaging length of stay. Either edge
     -- truncates the stay, so treating them separately invites using one and
     -- forgetting the other.
     reservations.is_left_censored
     or reservations.is_right_censored as is_censored,
-
     -- Denormalized listing attributes: intentional star-schema redundancy, so
     -- "average length of stay by neighborhood" needs no join to dim_listings.
     listings.listing_name,
@@ -93,18 +65,12 @@ select
     listings.room_type,
     listings.accommodates,
     listings.host_id,
-
     amenities.has_air_conditioning,
     amenities.has_lockbox,
     amenities.has_first_aid_kit,
     amenities.amenity_count,
-
     reservations.is_orphan_listing
 
 from reservations
--- Left, not inner. int_listings covers the orphans, so the two are equivalent
--- today — but the reason for the left join has not changed: an orphan listing
--- has booked nights and real revenue, and an inner join is the kind of thing
--- that would drop them silently if the listing universe ever narrowed again.
 left join listings on reservations.listing_id = listings.listing_id
 left join amenities on reservations.listing_id = amenities.listing_id

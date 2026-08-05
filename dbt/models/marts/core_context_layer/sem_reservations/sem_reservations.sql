@@ -1,20 +1,3 @@
--- Bookings: how many, how long, and what each was worth. One row per
--- reservation.
---
--- Separate from sem_listing_daily because the grains differ and cannot be mixed:
--- one row per reservation here against one row per listing-night there. One view
--- holding both would let "reservations by month" join a booking against every
--- night it occupies and count it once per night. Snowflake returns that without
--- complaint.
---
--- Answers business questions 17, 22 and 23.
---
--- What this table cannot do, because it is derived from occupied calendar nights
--- rather than from a bookings source: cancelled and never-confirmed bookings are
--- invisible, so conversion and cancellation rate are out of reach, and there is
--- no booking-created timestamp anywhere in the raw data, so lead time and
--- booking pace are too. Stated in the view COMMENT so a natural-language client
--- gets told rather than guessing.
 {{ config(materialized='semantic_view') }}
 
 TABLES (
@@ -87,9 +70,6 @@ DIMENSIONS (
         != reservation.check_in_month
         COMMENT = 'True where the stay starts in one month and ends in another. Question 22 - these are the reservations whose revenue would need prorating if monthly revenue had to be exact.',
 
-    -- The filter that changes the answer, and the reason it is one column rather
-    -- than two: either edge truncates a stay, so exposing left and right
-    -- separately invites filtering one and forgetting the other.
     reservation.is_censored AS reservation.is_censored
         COMMENT = 'True for reservations truncated by an edge of the snapshot, whose real length is unknown and whose nights is therefore a floor. EXCLUDE these when averaging length of stay - including them pulls the mean DOWN, since every censored stay is recorded shorter than it really was. KEEP them when counting bookings or totalling revenue, because those bookings really happened and their revenue is real.',
 
@@ -157,8 +137,6 @@ METRICS (
         WITH SYNONYMS = ('revenue', 'earnings')
         COMMENT = 'Booking revenue. Reconciles with total_revenue in sem_listing_daily, since both derive from the same occupied nights.',
 
-    -- The metric where the censoring filter is built in rather than left to the
-    -- caller. This is the whole reason is_censored exists as a column.
     reservation.avg_length_of_stay
         AS avg(case when not reservation.is_censored
                 then reservation.nights end)
@@ -204,13 +182,4 @@ COMMENT = 'Rental bookings: volume, length of stay, and booking value at one row
 
 AI_SQL_GENERATION 'Always use reservation_key as the reservation identifier, never reservation_id, which is NOT unique - the same id can cover separate stays on different listings. For any question about how long people stay, use the avg_length_of_stay metric, which already excludes the censored reservations; do not average the nights fact directly, because censored stays are truncated and bias it down. For counts and revenue do NOT filter is_censored, since those bookings really happened. The snapshot is a fixed one-year window, not a rolling one - never use current_date. Revenue is not prorated across months: a stay is attributed entirely to its check-in month.'
 
-{#
-    Verified queries for the three questions this view answers. The entries live
-    in macros/verified_queries/, one macro per question, because the SQL is long
-    and the caveat each entry pins is worth a comment next to it.
-
-    Not yet validated. Snowflake accepts a verified query without checking that
-    it runs, so these build green either way - the validator in TODO item 14 is
-    what will make "verified" mean anything here.
-#}
 {{ ai_verified_queries(['q17', 'q22', 'q23']) }}

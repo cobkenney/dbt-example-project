@@ -3,12 +3,7 @@ version: 2
 models:
   - name: dim_hosts
     description: >
-      One row per host: portfolio size, tenure, and performance. The second
-      dimension in the star schema — both facts carry host_id, so revenue and
-      reservations can be sliced by host segment.
-
-      host_name is PII and is not present in plaintext anywhere in this project.
-      Join on host_id.
+      One row per host: portfolio size, tenure, and performance.
     config:
       tags: ['1x_day']
     columns:
@@ -50,10 +45,6 @@ models:
       - name: verification_list
         description: "{{ doc('verification_list') }}"
 
-      # Unlike int_hosts, these are named explicitly in dim_hosts.sql rather than
-      # passed through with select *, so this list IS exhaustive — a new method
-      # upstream will not appear here until someone adds it in both places. That
-      # is the intended friction for a mart column.
       - name: is_verified_email
         description: "{{ doc('is_verified_email') }}"
 

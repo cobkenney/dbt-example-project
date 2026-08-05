@@ -1,25 +1,3 @@
--- Nightly economics: revenue, pricing, occupancy and availability at the
--- listing x date grain.
---
--- The measure table is fct_listing_daily. dim_listings and dim_hosts join in as
--- attribute sources only — their own lifetime measures (total_revenue,
--- occupancy_rate, revenue_per_listing) are deliberately NOT exposed here, and
--- live in sem_listing_performance and sem_host_performance instead.
---
--- THAT SPLIT IS THE WHOLE REASON THERE ARE FOUR OF THESE. A semantic view will
--- happily aggregate across a join, and Snowflake raises no error when the join
--- fans out: summing dim_listings.total_revenue grouped by calendar_date
--- multiplies each listing by its calendar rows. Exposing one grain of
--- additive measure per view makes that impossible to write rather than merely
--- documented.
---
--- Answers business questions 1, 2, 3, 6, 10, 15, 16, 21 and 25 — see
--- BUSINESS_QUESTIONS.md.
---
--- COMMENT text carries the caveats because Cortex Analyst reads it to choose
--- between metrics. Apostrophes are avoided throughout: the DDL is a single
--- quoted string per comment, and an escaped apostrophe inside it is a syntax
--- error waiting for whoever edits next.
 {{ config(materialized='semantic_view') }}
 
 TABLES (
@@ -76,10 +54,6 @@ FACTS (
 )
 
 DIMENSIONS (
-    -- The grouping key questions 2, 3 and 15 are built on: per-listing price
-    -- change, per-listing availability runs, per-listing price churn. Without it
-    -- the only per-listing access is the distinct-count metric, which cannot
-    -- group.
     daily.listing_id AS daily.listing_id
         COMMENT = 'Listing identifier. Group by this for anything measured per listing over time.',
 
@@ -109,18 +83,10 @@ DIMENSIONS (
     daily.reservation_id AS daily.reservation_id
         COMMENT = 'Booking occupying this date, NULL when available. NOT unique on its own - the same id can cover two separate stays on different listings. Count reservations in sem_reservations, not here.',
 
-    -- Questions 3 and 25, and the only reason they are answerable here. A
-    -- semantic view cannot express a window function, so the gap-and-island
-    -- that identifies a contiguous availability run is precomputed on
-    -- fct_listing_daily and grouped on as an ordinary key.
     daily.availability_window_seq AS daily.availability_window_seq
         WITH SYNONYMS = ('availability window', 'availability run', 'vacancy run')
         COMMENT = 'Which contiguous run of available nights this date belongs to, numbered per listing. Group by listing_id and this to get one row per availability window. MEANINGFUL ONLY WHERE is_available IS TRUE - always filter is_available before grouping on it. It is a running count of runs started, so a booked night carries the number of the run that closed before it, and a group that omits the filter collects those booked nights and reports a longer window than exists. Window length is the count of nights in the group, NEVER a date difference: every available date is itself a bookable night, so a datediff between the first and last date of a run undercounts it by one.',
 
-    -- Meant for the WHERE clause rather than as a grouping key. The docs give a
-    -- LABELS = (FILTER) clause for saying exactly that, but this Snowflake
-    -- version rejects it as a syntax error — so the instruction lives in the
-    -- COMMENT and in AI_SQL_GENERATION below, which Cortex Analyst also reads.
     daily.is_orphan_listing AS daily.is_orphan_listing
         COMMENT = 'True for a listing the calendar references that has no listings row, so its descriptive columns are all NULL. Filter it out when comparing attributes. LEAVE IT IN when totalling revenue - orphans carry real booked revenue, and dropping them shifts every revenue share, including the answer to question 1.',
 
@@ -155,10 +121,6 @@ DIMENSIONS (
         WITH SYNONYMS = ('review score', 'rating')
         COMMENT = 'Average review score. NULL for listings with no reviews.',
 
-    -- Amenity flags. Only the three the daily fact carries: the fact does not
-    -- pivot every known amenity, and the flags it does carry are the ones the
-    -- business questions filter on. Reach the other flags through
-    -- sem_listing_performance, or int_listing_amenities for the full set.
     daily.has_air_conditioning AS daily.has_air_conditioning
         WITH SYNONYMS = ('ac', 'air con')
         COMMENT = 'True where the listing offers air conditioning. For question 1, the share of revenue from listings without it.',
@@ -180,7 +142,6 @@ DIMENSIONS (
 )
 
 METRICS (
-    -- Additive, and the reason this view exists.
     daily.total_revenue AS sum(daily.revenue)
         WITH SYNONYMS = ('revenue', 'earnings', 'income')
         COMMENT = 'Booked revenue. Sums only occupied nights, since revenue is NULL on available ones.',
@@ -196,9 +157,6 @@ METRICS (
         WITH SYNONYMS = ('vacant nights', 'empty nights')
         COMMENT = 'Nights still open.',
 
-    -- TWO occupancy definitions, both named, because they answer different
-    -- questions and disagree. Leaving only one invites the other being
-    -- recomputed by hand and inconsistently.
     daily.occupancy_rate AS div0(count_if(not daily.is_available), count(*))
         WITH SYNONYMS = ('occupancy', 'utilization')
         COMMENT = 'Booked nights divided by total nights in whatever slice is grouped. Night-weighted, so it is the correct portfolio-level occupancy: a listing with more calendar rows counts for more. Use this by default.',
@@ -217,7 +175,6 @@ METRICS (
     daily.max_nightly_price AS max(daily.price)
         COMMENT = 'Highest rate offered in the slice.',
 
-    -- Question 15.
     daily.distinct_prices AS count(distinct daily.price)
         WITH SYNONYMS = ('price changes', 'price points')
         COMMENT = 'Distinct nightly rates in the slice. Grouped by listing this separates dynamic-pricing hosts from set-and-forget ones - a value of 1 means the rate never moved all year.',
@@ -235,20 +192,12 @@ METRICS (
     daily.avg_price_per_bed AS avg(daily.price_per_bed)
         COMMENT = 'Mean of price per bed. Also short some entire homes, since beds goes to 0 on a few of them. Compresses the same premium further than the per-bedroom version does.',
 
-    -- The third of the three normalizations, and the only one with no gaps.
-    -- Present so the per-guest fact has an aggregate like the other two - a fact
-    -- with no metric over it is only reachable by pulling it at row grain.
     daily.avg_price_per_guest AS avg(daily.price_per_guest)
         COMMENT = 'Mean of price per guest of capacity. accommodates is populated on every listing, so unlike the per-bedroom and per-bed versions this one is backed by all of them - prefer it when the comparison has to cover the whole portfolio.',
 
     daily.avg_minimum_nights AS avg(daily.minimum_nights)
         COMMENT = 'Mean minimum-stay requirement. For question 16, against occupancy.',
 
-    -- The two stay-limit extremes rather than averages, because both questions
-    -- built on availability_window_seq compare a window LENGTH against a limit,
-    -- and an average limit across the window is not a constraint anything has to
-    -- satisfy. The limits do move within a window - minimum_nights varies inside
-    -- some runs - so which end is taken changes the answer.
     daily.max_maximum_nights AS max(daily.maximum_nights)
         COMMENT = 'Longest stay any listing in the slice will accept. For question 3, the cap that clamps an availability window.',
 
@@ -260,36 +209,6 @@ COMMENT = 'Nightly economics for rental listings: revenue, pricing, occupancy an
 
 AI_SQL_GENERATION 'The calendar is a fixed snapshot, not a rolling window. NEVER use current_date or current_timestamp for recency, staleness or tenure - anchor to the max calendar_date or to the as_of_date column instead, or the answer changes on every run. Prefer the precomputed month_start_date over date_trunc on calendar_date. Do not filter out is_orphan_listing when totalling revenue, because orphan listings carry real booked revenue; do filter them out when comparing descriptive attributes, which are NULL for them. Do not count reservations in this view - reservation_id is not unique here and each booking spans many rows. For anything about a contiguous stretch of open nights, group by listing_id and availability_window_seq with is_available filtered first, and measure the length of a window as the count of rows in the group rather than as a difference between dates.'
 
-{#
-    Verified queries for the nine questions this view answers. The entries live
-    in macros/verified_queries/, one macro per question.
-
-    QUESTIONS 3 AND 26 ARE THE REASON A COLUMN GOT ADDED UPSTREAM. Both need
-    contiguous runs of available nights, which is a gap-and-island, and a semantic
-    view cannot express a window function at all. Rather than declare them
-    unanswerable here, int_listing_daily precomputes the run identity and
-    fct_listing_daily carries it, so availability_window_seq is an ordinary
-    dimension and the window is a GROUP BY. Both queries are still CTE-wrapped -
-    the aggregation is two-level and the clamp is arithmetic across aggregates -
-    but they no longer restate the window function. The rules the column does NOT
-    encode are in macros/verified_queries/verified_queries_q03.sql; the clamp
-    premise is held by tests/assert_stay_cap_binds.sql.
-
-    The other CTE wraps are the familiar two reasons. Questions 16 and 21 band or
-    count over FACTS - minimum_nights, price_per_bedroom - and Snowflake rejects
-    FACTS and METRICS in one clause. Questions 1, 2, 10 and 15 wrap to do
-    something outside the clause that no semantic view can do: a within-partition
-    share, a per-listing endpoint difference, a non-alphabetical day-of-week
-    ordering, a filter on an aggregate.
-
-    The names are table-qualified - daily.total_revenue, listing.neighborhood -
-    because this view exposes dimensions from three logical tables and the
-    qualified form is what Snowflake documents.
-
-    Not yet validated. Snowflake accepts a verified query without checking that
-    it runs, so these build green either way - the validator in TODO item 14 is
-    what will make "verified" mean anything here.
-#}
 {{ ai_verified_queries([
     'q01', 'q02', 'q03', 'q06', 'q10',
     'q15', 'q16', 'q21', 'q25',
