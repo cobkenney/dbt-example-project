@@ -486,3 +486,6 @@ time, and host-blocked-vs-booked unanswerable, and none of them is a modeling
 problem. A real host source would also settle whether hosts need SCD2 treatment,
 which [assert_host_attributes_consistent.sql](dbt/tests/assert_host_attributes_consistent.sql)
 currently only watches for.
+
+**Get more history.** Get more calendar history (past, present or future) and
+relevant amenities changelogs.

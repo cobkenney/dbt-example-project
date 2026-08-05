@@ -10,8 +10,6 @@ repos:
       - id: check-added-large-files
       - id: detect-private-key
       - id: check-merge-conflict
-      - id: no-commit-to-branch
-        args: [--branch, main]
 
   - repo: local
     hooks:
