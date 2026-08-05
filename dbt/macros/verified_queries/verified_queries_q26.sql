@@ -18,7 +18,7 @@
     comparison that hides its denominator is the failure mode of this question,
     not a detail.
 
-    Orphan listing filtered out - it has a NULL neighborhood and would otherwise
+    Deleted listing filtered out - it has a NULL neighborhood and would otherwise
     form a group whose name is missing.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
@@ -40,7 +40,7 @@ from semantic_view(
         listing.portfolio_revenue,
         listing.avg_revenue_per_listing
     dimensions listing.neighborhood
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by listings desc
     {%- endset -%}
@@ -56,7 +56,7 @@ from semantic_view(
     dimensions
         listing.neighborhood,
         listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by neighborhood, listings desc
     {%- endset -%}

@@ -13,7 +13,7 @@ models:
         description: >
           {{ doc('host_id') }}
 
-          Primary key here. One row per host across the non-orphan listings.
+          Primary key here. One row per host across the non-deleted listings.
         data_tests:
           - not_null
 

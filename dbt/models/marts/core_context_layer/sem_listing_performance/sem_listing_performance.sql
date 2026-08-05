@@ -4,7 +4,7 @@ TABLES (
     listing AS {{ ref('dim_listings') }}
         PRIMARY KEY (listing_id)
         WITH SYNONYMS = ('listings', 'properties', 'units', 'rentals')
-        COMMENT = 'One row per listing with lifetime measures over the fixed one-year snapshot. Covers every listing the calendar references, including the orphans whose descriptive columns are all NULL.',
+        COMMENT = 'One row per listing with lifetime measures over the fixed one-year snapshot. Covers every listing the calendar references, including deleted listings, whose descriptive columns are all NULL.',
 
     host AS {{ ref('dim_hosts') }}
         PRIMARY KEY (host_id)
@@ -33,7 +33,7 @@ FACTS (
 
     listing.list_price AS listing.list_price
         WITH SYNONYMS = ('advertised price', 'asking price')
-        COMMENT = 'Advertised nightly rate from the listings table. NULL for an orphan listing.',
+        COMMENT = 'Advertised nightly rate from the listings table. NULL for a deleted listing.',
 
     listing.booked_nights AS listing.booked_nights
         COMMENT = 'Nights occupied over the year.',
@@ -81,11 +81,11 @@ DIMENSIONS (
 
     listing.listing_name AS listing.listing_name
         WITH SYNONYMS = ('name', 'title')
-        COMMENT = 'Listing title. NULL for an orphan listing.',
+        COMMENT = 'Listing title. NULL for a deleted listing.',
 
     listing.neighborhood AS listing.neighborhood
         WITH SYNONYMS = ('area', 'district', 'location')
-        COMMENT = 'Listing neighborhood. NULL for an orphan listing. Some neighborhoods hold only a single listing, so treat per-neighborhood averages as THIN and check the listing count alongside any of them.',
+        COMMENT = 'Listing neighborhood. NULL for a deleted listing. Some neighborhoods hold only a single listing, so treat per-neighborhood averages as THIN and check the listing count alongside any of them.',
 
     listing.property_type AS listing.property_type
         COMMENT = 'Apartment, house, condominium and similar.',
@@ -127,7 +127,7 @@ DIMENSIONS (
     listing.has_reviews AS listing.number_of_reviews > 0
         COMMENT = 'True where the listing has ever been reviewed. Separates a genuinely stale listing from one that was never reviewed at all.',
 
-    listing.is_orphan_listing AS listing.is_orphan_listing
+    listing.is_deleted AS listing.is_deleted
         COMMENT = 'True for a listing the calendar references that has no listings row, so every descriptive column is NULL. Filter it out when comparing attributes - it would otherwise form a NULL group. LEAVE IT IN when totalling revenue, since it carries real booked revenue.',
 
     listing.has_air_conditioning AS listing.has_air_conditioning
@@ -166,7 +166,7 @@ DIMENSIONS (
         COMMENT = 'Whole years between the host joining and the snapshot end. Little variance - host_since is tightly clustered, so it explains very little.',
 
     host.is_multi_listing_host AS host.is_multi_listing_host
-        COMMENT = 'True where the host holds more than one listing. A small minority of hosts, though they hold a disproportionate share of listings. NULL for an orphan listing, which has no host.',
+        COMMENT = 'True where the host holds more than one listing. A small minority of hosts, though they hold a disproportionate share of listings. NULL for a deleted listing, which has no host.',
 
     host.verification_count AS host.verification_count
         COMMENT = 'Number of verification methods the host completed. Read as adoption, not as trust - see SEM_HOST_PERFORMANCE for why it carries no performance signal.'
@@ -206,7 +206,7 @@ METRICS (
 
     listing.avg_list_price AS avg(listing.list_price)
         WITH SYNONYMS = ('average advertised price')
-        COMMENT = 'Mean advertised rate. Excludes orphan listings, whose list_price is NULL.',
+        COMMENT = 'Mean advertised rate. Excludes deleted listings, whose list_price is NULL.',
 
     listing.avg_achieved_rate AS avg(listing.achieved_nightly_rate)
         WITH SYNONYMS = ('average earned rate')
@@ -238,12 +238,12 @@ METRICS (
         COMMENT = 'Longest gap since a review in the slice, anchored to as_of_date.',
 
     listing.hosts AS count(distinct listing.host_id)
-        COMMENT = 'Distinct hosts in the slice. Excludes orphan listings, whose host_id is NULL.'
+        COMMENT = 'Distinct hosts in the slice. Excludes deleted listings, whose host_id is NULL.'
 )
 
 COMMENT = 'Lifetime performance per rental listing over a fixed one-year snapshot: revenue, occupancy, pricing against the advertised rate, reviews, and attributes including amenities. Use this to compare listings or segments cross-sectionally - which neighborhood or room type performs, which listings never earned, whether reviews or amenities go with higher rates. For anything by date or month use SEM_LISTING_DAILY; for booking counts and length of stay use SEM_RESERVATIONS; for host portfolios use SEM_HOST_PERFORMANCE. IMPORTANT on amenities: any link between an amenity and revenue here is CORRELATION AT A POINT IN TIME, not impact. Every amenity changelog event predates the calendar window entirely, so there is no before-and-after period in the data and the revenue effect of ADDING an amenity cannot be measured at any modelling effort.'
 
-AI_SQL_GENERATION 'Measures here are already lifetime totals per listing, so never multiply them by a night count or group them by a date. For recency and staleness use days_since_last_review or months_since_last_review, which anchor to as_of_date - NEVER use current_date, because the snapshot is a fixed window and current_date makes the answer drift on every run. Distinguish a NULL last_review_date, meaning never reviewed, from a large staleness value, meaning reviewed long ago. When comparing descriptive attributes filter is_orphan_listing to false, since an orphan has NULL attributes and would form a NULL group; when totalling revenue leave it in. For occupancy pick deliberately: avg_occupancy_rate is listing-weighted and right for comparing segments, occupancy_rate_weighted is night-weighted and right for a portfolio total. Never present an amenity-to-revenue relationship as causal.'
+AI_SQL_GENERATION 'Measures here are already lifetime totals per listing, so never multiply them by a night count or group them by a date. For recency and staleness use days_since_last_review or months_since_last_review, which anchor to as_of_date - NEVER use current_date, because the snapshot is a fixed window and current_date makes the answer drift on every run. Distinguish a NULL last_review_date, meaning never reviewed, from a large staleness value, meaning reviewed long ago. When comparing descriptive attributes filter is_deleted to false, since a deleted listing has NULL attributes and would form a NULL group; when totalling revenue leave it in. For occupancy pick deliberately: avg_occupancy_rate is listing-weighted and right for comparing segments, occupancy_rate_weighted is night-weighted and right for a portfolio total. Never present an amenity-to-revenue relationship as causal.'
 
 {{ ai_verified_queries([
     'q04', 'q05', 'q07', 'q08', 'q09',

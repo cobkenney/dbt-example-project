@@ -45,7 +45,7 @@
     every listing, so it is the only one of the three normalizations backed by the
     whole portfolio - if a comparison has to cover everything, that is the one.
 
-    is_orphan_listing filtered throughout: an orphan has NULL bedrooms, beds and
+    is_deleted filtered throughout: a deleted listing has NULL bedrooms, beds and
     room type, so it contributes nothing to either normalization and would form a
     NULL group. Correct here, because the question compares attributes.
 
@@ -71,7 +71,7 @@ with per_listing as (
             listing.room_type,
             listing.bedrooms,
             listing.beds
-        where not daily.is_orphan_listing
+        where not daily.is_deleted
     )
 )
 
@@ -108,7 +108,7 @@ from semantic_view(
         listing.bedrooms,
         listing.beds,
         listing.accommodates
-    where not daily.is_orphan_listing
+    where not daily.is_deleted
 )
 order by avg_price_per_bedroom desc nulls last
     {%- endset -%}
@@ -124,7 +124,7 @@ from semantic_view(
         daily.avg_price_per_bed,
         daily.avg_price_per_guest
     dimensions listing.neighborhood
-    where not daily.is_orphan_listing
+    where not daily.is_deleted
 )
 order by avg_price_per_bedroom desc nulls last
     {%- endset -%}

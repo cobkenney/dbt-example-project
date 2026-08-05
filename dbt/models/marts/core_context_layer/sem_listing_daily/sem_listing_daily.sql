@@ -19,10 +19,10 @@ TABLES (
 
 RELATIONSHIPS (
     -- Complete: dim_listings covers every listing the calendar references,
-    -- including the orphans.
+    -- including the deleted listings.
     daily_to_listing AS daily (listing_id) REFERENCES listing (listing_id),
 
-    -- NOT complete. An orphan listing has a NULL host_id, so grouping a daily
+    -- NOT complete. A deleted listing has a NULL host_id, so grouping a daily
     -- metric by any host attribute drops its rows and the revenue on them.
     -- Group by listing attributes when a total has to reconcile.
     listing_to_host AS listing (host_id) REFERENCES host (host_id)
@@ -59,7 +59,7 @@ DIMENSIONS (
 
     listing.listing_name AS listing.listing_name
         WITH SYNONYMS = ('name', 'title')
-        COMMENT = 'Listing title, from the listing dimension rather than the fact - a name repeated on every daily row of a listing is the redundancy the star schema exists to avoid. NULL for an orphan listing.',
+        COMMENT = 'Listing title, from the listing dimension rather than the fact - a name repeated on every daily row of a listing is the redundancy the star schema exists to avoid. NULL for a deleted listing.',
 
     daily.calendar_date AS daily.calendar_date
         WITH SYNONYMS = ('date', 'night', 'day')
@@ -87,12 +87,12 @@ DIMENSIONS (
         WITH SYNONYMS = ('availability window', 'availability run', 'vacancy run')
         COMMENT = 'Which contiguous run of available nights this date belongs to, numbered per listing. Group by listing_id and this to get one row per availability window. MEANINGFUL ONLY WHERE is_available IS TRUE - always filter is_available before grouping on it. It is a running count of runs started, so a booked night carries the number of the run that closed before it, and a group that omits the filter collects those booked nights and reports a longer window than exists. Window length is the count of nights in the group, NEVER a date difference: every available date is itself a bookable night, so a datediff between the first and last date of a run undercounts it by one.',
 
-    daily.is_orphan_listing AS daily.is_orphan_listing
-        COMMENT = 'True for a listing the calendar references that has no listings row, so its descriptive columns are all NULL. Filter it out when comparing attributes. LEAVE IT IN when totalling revenue - orphans carry real booked revenue, and dropping them shifts every revenue share, including the answer to question 1.',
+    daily.is_deleted AS daily.is_deleted
+        COMMENT = 'True for a listing the calendar references that has no listings row, so its descriptive columns are all NULL. Filter it out when comparing attributes. LEAVE IT IN when totalling revenue - deleted listings carry real booked revenue, and dropping them shifts every revenue share, including the answer to question 1.',
 
     listing.neighborhood AS listing.neighborhood
         WITH SYNONYMS = ('area', 'district', 'location')
-        COMMENT = 'Listing neighborhood. NULL for an orphan listing.',
+        COMMENT = 'Listing neighborhood. NULL for a deleted listing.',
 
     listing.property_type AS listing.property_type
         COMMENT = 'Apartment, house, condominium and similar.',
@@ -138,7 +138,7 @@ DIMENSIONS (
         COMMENT = 'Whole years between the host joining and the snapshot end. Little variance to work with - host_since is tightly clustered, so it explains very little.',
 
     host.is_multi_listing_host AS host.is_multi_listing_host
-        COMMENT = 'True where the host holds more than one listing, which is a small minority of hosts - treat segment comparisons on it as indicative. Reaching this from the daily grain drops the orphan listings, which have no host.'
+        COMMENT = 'True where the host holds more than one listing, which is a small minority of hosts - treat segment comparisons on it as indicative. Reaching this from the daily grain drops the deleted listings, which have no host.'
 )
 
 METRICS (
@@ -184,7 +184,7 @@ METRICS (
         COMMENT = 'Distinct listings in the slice. Grouped by neighborhood this is supply density, question 26, which needed a new model before this view existed.',
 
     daily.hosts AS count(distinct daily.host_id)
-        COMMENT = 'Distinct hosts in the slice. Excludes orphan listings, whose host_id is NULL.',
+        COMMENT = 'Distinct hosts in the slice. Excludes deleted listings, whose host_id is NULL.',
 
     daily.avg_price_per_bedroom AS avg(daily.price_per_bedroom)
         COMMENT = 'Mean of price per bedroom. Backed by every private room but only some entire homes, since bedrooms goes NULL on entire homes only - so an entire-home figure here rests on a smaller base than the raw price does. Normalizing COMPRESSES the entire-home premium over a private room rather than removing it.',
@@ -207,7 +207,7 @@ METRICS (
 
 COMMENT = 'Nightly economics for rental listings: revenue, pricing, occupancy and availability at listing x date grain over a fixed one-year snapshot. Use this for anything about a specific date, month, day of week, or price over time. For lifetime per-listing measures use SEM_LISTING_PERFORMANCE, for booking counts and length of stay use SEM_RESERVATIONS, for host portfolios use SEM_HOST_PERFORMANCE.'
 
-AI_SQL_GENERATION 'The calendar is a fixed snapshot, not a rolling window. NEVER use current_date or current_timestamp for recency, staleness or tenure - anchor to the max calendar_date or to the as_of_date column instead, or the answer changes on every run. Prefer the precomputed month_start_date over date_trunc on calendar_date. Do not filter out is_orphan_listing when totalling revenue, because orphan listings carry real booked revenue; do filter them out when comparing descriptive attributes, which are NULL for them. Do not count reservations in this view - reservation_id is not unique here and each booking spans many rows. For anything about a contiguous stretch of open nights, group by listing_id and availability_window_seq with is_available filtered first, and measure the length of a window as the count of rows in the group rather than as a difference between dates.'
+AI_SQL_GENERATION 'The calendar is a fixed snapshot, not a rolling window. NEVER use current_date or current_timestamp for recency, staleness or tenure - anchor to the max calendar_date or to the as_of_date column instead, or the answer changes on every run. Prefer the precomputed month_start_date over date_trunc on calendar_date. Do not filter out is_deleted when totalling revenue, because deleted listings carry real booked revenue; do filter them out when comparing descriptive attributes, which are NULL for them. Do not count reservations in this view - reservation_id is not unique here and each booking spans many rows. For anything about a contiguous stretch of open nights, group by listing_id and availability_window_seq with is_available filtered first, and measure the length of a window as the count of rows in the group rather than as a difference between dates.'
 
 {{ ai_verified_queries([
     'q01', 'q02', 'q03', 'q06', 'q10',

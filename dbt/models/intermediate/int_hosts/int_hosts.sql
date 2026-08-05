@@ -3,7 +3,7 @@ with listings as (
 
     select *
     from {{ ref('int_listings') }}
-    where not is_orphan_listing
+    where not is_deleted
 
 ),
 

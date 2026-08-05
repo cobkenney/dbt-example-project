@@ -53,7 +53,7 @@ from semantic_view(
         listing.listing_id,
         listing.listing_name,
         listing.neighborhood
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_discount_to_list desc
     {%- endset -%}
@@ -70,7 +70,7 @@ from semantic_view(
     dimensions
         listing.neighborhood,
         listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_discount_to_list desc
     {%- endset -%}

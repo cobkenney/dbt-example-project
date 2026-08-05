@@ -38,7 +38,7 @@ final as (
         listings.host_since,
         listings.host_location,
         listings.price as list_price,
-        listings.listing_id is null as is_orphan_listing
+        listings.listing_id is null as is_deleted
 
     from listing_universe
     left join listings

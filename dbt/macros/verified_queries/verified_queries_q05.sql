@@ -66,7 +66,7 @@ from semantic_view(
         listing.never_booked_listings,
         listing.avg_occupancy_rate
     dimensions listing.neighborhood
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by never_booked_listings desc
     {%- endset -%}

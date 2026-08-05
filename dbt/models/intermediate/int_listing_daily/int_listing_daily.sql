@@ -55,7 +55,7 @@ joined as (
         listings.bedrooms,
         listings.beds,
         listings.host_id,
-        listings.is_orphan_listing,
+        listings.is_deleted,
         amenities.* exclude (listing_id)
 
     from calendar

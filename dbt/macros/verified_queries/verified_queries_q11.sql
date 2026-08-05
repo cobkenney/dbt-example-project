@@ -107,7 +107,7 @@ from semantic_view(
         listing.listing_id,
         listing.listing_name,
         listing.has_reviews
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_review_score desc nulls last
     {%- endset -%}

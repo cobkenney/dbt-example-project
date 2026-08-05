@@ -34,7 +34,7 @@ Identifier of the rental listing. Joins every model in the project together.
 
 The calendar and changelog cover more listings than the raw listings table does,
 so models that carry descriptive attributes leave them NULL for the missing ones
-rather than dropping the rows. See is_orphan_listing.
+rather than dropping the rows. See is_deleted.
 {% enddocs %}
 
 {% docs calendar_id %}
@@ -491,14 +491,19 @@ Whether the listing offers a kitchen. Exact match on the "Kitchen" amenity.
 
 {#-- Data-quality flags ----------------------------------------------------#}
 
-{% docs is_orphan_listing %}
+{% docs is_deleted %}
 True where the listing appears in the calendar and changelog but not in the raw
 listings table, so every descriptive column is NULL for it.
 
+Read as a hard delete: the row was removed from the source listings table while
+its calendar history stayed behind. The delete is inferred from the missing row,
+not recorded by the source, so there is no delete timestamp and no way to tell a
+deletion from a listing that was never loaded.
+
 Computed once, in `int_listings`, and read by every model that carries it. Joins
 are left joins throughout so these rows survive, and they carry real booked
-revenue — `tests/assert_orphan_listing_count.sql` pins how many orphans there are
-and warns when that changes.
+revenue — `tests/assert_deleted_listing_count.sql` pins how many there are and
+warns when that changes.
 
 Consumers should include or exclude them explicitly rather than by accident:
 excluding them moves revenue-share figures by enough to notice.

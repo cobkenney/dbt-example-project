@@ -4,7 +4,7 @@ TABLES (
     host AS {{ ref('dim_hosts') }}
         PRIMARY KEY (host_id)
         WITH SYNONYMS = ('hosts', 'owners', 'operators', 'landlords')
-        COMMENT = 'One row per host with portfolio size, tenure, verification status, and lifetime performance over the fixed one-year snapshot. Covers only listings that have a listings row - orphan listings have no host, so their revenue is absent from every figure here.'
+        COMMENT = 'One row per host with portfolio size, tenure, verification status, and lifetime performance over the fixed one-year snapshot. Covers only listings that have a listings row - deleted listings have no host, so their revenue is absent from every figure here.'
 )
 
 -- No RELATIONSHIPS clause: one logical table, nothing to join. Adding
@@ -132,15 +132,15 @@ DIMENSIONS (
 METRICS (
     host.hosts AS count(*)
         WITH SYNONYMS = ('host count', 'number of hosts')
-        COMMENT = 'Number of hosts in the slice. Do NOT compare directly against a listing count - hosts hold more listings than there are hosts, and orphan listings have no host at all.',
+        COMMENT = 'Number of hosts in the slice. Do NOT compare directly against a listing count - hosts hold more listings than there are hosts, and deleted listings have no host at all.',
 
     host.listings AS sum(host.listing_count)
         WITH SYNONYMS = ('properties', 'portfolio size')
-        COMMENT = 'Total listings held by the hosts in the slice. This is FEWER than the total listing count in the other views - orphan listings have no host row, so they are absent here.',
+        COMMENT = 'Total listings held by the hosts in the slice. This is FEWER than the total listing count in the other views - deleted listings have no host row, so they are absent here.',
 
     host.portfolio_revenue AS sum(host.total_revenue)
         WITH SYNONYMS = ('total revenue', 'revenue')
-        COMMENT = 'Summed host revenue. Safe at this grain, one row per host. Does NOT reconcile with the revenue totals in the other three views, because the orphan listing revenue has no host to attribute it to.',
+        COMMENT = 'Summed host revenue. Safe at this grain, one row per host. Does NOT reconcile with the revenue totals in the other three views, because the deleted listing revenue has no host to attribute it to.',
 
     -- The metric the multi-listing finding turns on, and the reason for
     -- host-weighting.
@@ -170,7 +170,7 @@ METRICS (
 
     host.total_reservations AS sum(host.reservations)
         WITH SYNONYMS = ('bookings')
-        COMMENT = 'Total reservations across the hosts in the slice. Slightly BELOW the total in SEM_RESERVATIONS, since orphan-listing bookings have no host.',
+        COMMENT = 'Total reservations across the hosts in the slice. Slightly BELOW the total in SEM_RESERVATIONS, since bookings on deleted listings have no host.',
 
     host.avg_length_of_stay AS avg(host.avg_nights_per_stay)
         COMMENT = 'Mean of the per-host average stay length, already excluding censored stays. Barely differs between multi- and single-listing hosts, which is what shows question 19 to be an occupancy story rather than a stay-length one.',
@@ -202,6 +202,6 @@ METRICS (
 
 COMMENT = 'Rental host portfolios over a fixed one-year snapshot: portfolio size, tenure, verification status, and performance at one row per host. Covers only listings that have a listings row, so it holds fewer listings than the other views. Use this for which hosts to invest in, professional operators against casual ones, and whether tenure or verification tracks performance. Figures here are HOST-WEIGHTED - every host counts once whatever the portfolio size. For listing-weighted equivalents use SEM_LISTING_PERFORMANCE. IMPORTANT on trust signals: there is no finding here. Email and phone are held by every host, so their figures are just the overall average and cannot correlate with anything. The remaining spread is non-monotonic on tiny bases, and direction disagrees between measures - knowledge-based authentication has the highest review score and the lowest occupancy. There are more verification-method cells than there are hosts, so per-method figures rest on very few rows each. Read verification as ADOPTION and do not put an occupancy claim on a verification badge. Host tenure, question 20, has the same problem from the other side: host_since is tightly clustered, so there is almost no variance to explain performance with. A HOST REAL NAME CANNOT BE RETRIEVED - it is PII, masked before it reaches any of these models.'
 
-AI_SQL_GENERATION 'Compare hosts on avg_revenue_per_listing, never on portfolio_revenue or avg_revenue_per_host, both of which scale with portfolio size by construction. Figures here are host-weighted; if the question is really about listings, use SEM_LISTING_PERFORMANCE instead. Revenue here will NOT match the other views, because orphan listings have no host and their revenue is therefore absent - say so rather than presenting a reconciled total. Never attempt to return a host real name: only a salted hash exists, more than one host can share it, and it is not an identifier - use host_id. Tenure is anchored to the as_of_date column, so never use current_date. When asked whether verification predicts performance, report adoption counts and state plainly that the data does not support a causal or even a reliable correlational claim - and never build one on is_verified_email or is_verified_phone, which are true for every host.'
+AI_SQL_GENERATION 'Compare hosts on avg_revenue_per_listing, never on portfolio_revenue or avg_revenue_per_host, both of which scale with portfolio size by construction. Figures here are host-weighted; if the question is really about listings, use SEM_LISTING_PERFORMANCE instead. Revenue here will NOT match the other views, because deleted listings have no host and their revenue is therefore absent - say so rather than presenting a reconciled total. Never attempt to return a host real name: only a salted hash exists, more than one host can share it, and it is not an identifier - use host_id. Tenure is anchored to the as_of_date column, so never use current_date. When asked whether verification predicts performance, report adoption counts and state plainly that the data does not support a causal or even a reliable correlational claim - and never build one on is_verified_email or is_verified_phone, which are true for every host.'
 
 {{ ai_verified_queries(['q18', 'q19', 'q20']) }}

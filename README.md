@@ -45,7 +45,7 @@ though. This will be an assumption carried f
 
 **Hard deletes.** Listing 276450 has 365 calendar rows and 2 changelog rows but
 no row in `listings`. Dropping a year of availability data silently is worse
-than surfacing it, so it is kept everywhere and flagged `is_orphan_listing`;
+than surfacing it, so it is kept everywhere and flagged `is_deleted`;
 consumers decide. Revenue queries should keep it, attribute comparisons should
 filter it out.
 
@@ -181,9 +181,9 @@ changelog yields 2,285 listing-amenity pairs across 81 distinct names in
 one instance of it.
 
 **Sourced from the changelog, not `listings`.** The changelog covers all 50
-listings the calendar references; `listings` is missing the orphan. So the
-orphan gets real amenity flags instead of NULLs. Would prefer if the source
-contained the orphan / hard deletes.
+listings the calendar references; `listings` is missing the deleted one. So the
+deleted listing gets real amenity flags instead of NULLs. Would prefer if the
+source contained the hard deletes.
 
 **Amenity history was built and then deliberately collapsed.** A full SCD2
 version (`valid_from`/`valid_to` via `lead()`, joined to the calendar with
@@ -198,8 +198,8 @@ exactly when latest-wins would start misattributing revenue. If this test
 failed, we'd need to utilize the changelog history in fct_listing_daily.
 
 **Left joins are load-bearing.** An inner join against `listings` drops the
-orphan's 365 rows and $2,200 of booked July 2022 revenue — enough to move the
-no-AC revenue share from 21.2% to 22.1%. `is_orphan_listing` is computed once in
+deleted listing's 365 rows and $2,200 of booked July 2022 revenue — enough to move the
+no-AC revenue share from 21.2% to 22.1%. `is_deleted` is computed once in
 `int_listings` and read downstream, rather than each consumer deriving it from
 its own join.
 
@@ -297,7 +297,7 @@ rather than merely discouraged.
 
 Revenue deliberately does not reconcile across all four. Three views report
 $1,684,864; `sem_host_performance` reports $1,608,344, short by exactly the
-orphan listing's revenue, which has no host to attribute to. Both the `COMMENT`
+deleted listing's revenue, which has no host to attribute to. Both the `COMMENT`
 and `AI_SQL_GENERATION` text say so, so a client reports the gap rather than
 presenting a false reconciliation.
 
@@ -372,7 +372,7 @@ drifted, and one of the two documented run orders could not work at all.
 **Some of the bespoke tests** (steps 7, 8). The singular tests in
 [dbt/tests/](dbt/tests/) — asserting host attributes agree across a host's
 listings, checking the amenity changelog stays outside the calendar window,
-pinning the orphan listing count. Once the assumption to protect is
+pinning the deleted listing count. Once the assumption to protect is
 named, writing the SQL that fails when it breaks is mechanical. Naming the
 assumption is the part that isn't, and that came from step 3.
 

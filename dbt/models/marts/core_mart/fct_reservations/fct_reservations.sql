@@ -6,10 +6,10 @@ with reservations as (
 
 listings as (
 
-    -- int_listings, which covers the orphans too. That makes the join below
-    -- find a row for every reservation — an orphan's attributes are still
-    -- NULL, since it has none anywhere, but they are NULL from a row that
-    -- exists rather than from a join that missed.
+    -- int_listings, which covers the deleted listings too. That makes the join
+    -- below find a row for every reservation — a deleted listing's attributes
+    -- are still NULL, since it has none anywhere, but they are NULL from a row
+    -- that exists rather than from a join that missed.
     select * from {{ ref('int_listings') }}
 
 ),
@@ -69,7 +69,7 @@ select
     amenities.has_lockbox,
     amenities.has_first_aid_kit,
     amenities.amenity_count,
-    reservations.is_orphan_listing
+    reservations.is_deleted
 
 from reservations
 left join listings on reservations.listing_id = listings.listing_id

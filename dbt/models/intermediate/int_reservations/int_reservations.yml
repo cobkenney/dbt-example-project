@@ -59,8 +59,8 @@ models:
       - name: is_right_censored
         description: "{{ doc('is_reservation_censored') }}"
 
-      - name: is_orphan_listing
-        description: "{{ doc('is_orphan_listing') }}"
+      - name: is_deleted
+        description: "{{ doc('is_deleted') }}"
     data_tests:
       # The assumption min/max rests on. If an id's nights are not consecutive
       # it covers two separate stays, and check_out_date overstates the first.

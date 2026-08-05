@@ -43,8 +43,8 @@ models:
       - name: availability_window_seq
         description: "{{ doc('availability_window_seq') }}"
 
-      - name: is_orphan_listing
-        description: "{{ doc('is_orphan_listing') }}"
+      - name: is_deleted
+        description: "{{ doc('is_deleted') }}"
         data_tests:
           - not_null
 

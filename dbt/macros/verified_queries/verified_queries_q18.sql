@@ -17,7 +17,7 @@
       identifier.
 
     The portfolio total carries listings, which sums to FEWER than the total
-    listing count - orphan listings have no host row. Pinning it here makes that
+    listing count - deleted listings have no host row. Pinning it here makes that
     the answer rather than a discrepancy somebody finds later.
 
     Top-N is an outer order by and limit around the closing paren. That is

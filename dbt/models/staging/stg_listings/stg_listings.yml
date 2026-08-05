@@ -20,7 +20,7 @@ models:
           Primary key here. Unique and non-null after filtering the NULL-id
           source rows. Note this table is missing at least one listing that the
           calendar and changelog both reference — int_listings flags those as
-          orphans, and tests/assert_orphan_listing_count.sql pins how many.
+          deleted, and tests/assert_deleted_listing_count.sql pins how many.
         data_tests:
           - unique
           - not_null

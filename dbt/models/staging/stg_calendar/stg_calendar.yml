@@ -19,7 +19,7 @@ models:
 
           References stg_listings.listing_id, but some rows reference a listing
           absent from it — warns rather than errors so those rows survive into
-          int_listings, which flags them as orphans.
+          int_listings, which flags them as deleted.
         data_tests:
           - not_null
           - relationships:

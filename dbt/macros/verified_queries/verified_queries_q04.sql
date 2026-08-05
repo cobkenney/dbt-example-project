@@ -16,7 +16,7 @@
     listings rides along on every entry: some neighborhoods hold a single listing,
     so an occupancy average there is thin, and the base belongs next to it.
 
-    is_orphan_listing filtered out. An orphan has NULL neighborhood and room
+    is_deleted filtered out. A deleted listing has NULL neighborhood and room
     type, so it would otherwise form a NULL group. Correct here because the
     question compares attributes, and wrong for a revenue total.
 
@@ -37,7 +37,7 @@ from semantic_view(
         listing.total_booked_nights,
         listing.total_available_nights
     dimensions listing.neighborhood
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_occupancy_rate desc
     {%- endset -%}
@@ -52,7 +52,7 @@ from semantic_view(
         listing.total_booked_nights,
         listing.total_available_nights
     dimensions listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_occupancy_rate desc
     {%- endset -%}
@@ -68,7 +68,7 @@ from semantic_view(
     dimensions
         listing.neighborhood,
         listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by neighborhood, room_type
     {%- endset -%}

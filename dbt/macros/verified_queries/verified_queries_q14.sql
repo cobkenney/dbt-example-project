@@ -56,7 +56,7 @@ from semantic_view(
         listing.avg_list_price,
         listing.avg_occupancy_rate,
         listing.avg_revenue_per_listing
-    where listing.{{ flag }} and not listing.is_orphan_listing
+    where listing.{{ flag }} and not listing.is_deleted
 )
         {%- endset -%}
         {%- do branches.append(branch) -%}
@@ -78,7 +78,7 @@ from semantic_view(
         listing.avg_occupancy_rate,
         listing.avg_revenue_per_listing
     dimensions listing.has_air_conditioning
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by has_air_conditioning desc
     {%- endset -%}
@@ -90,7 +90,7 @@ with listing_facts as (
         {{ view }}
         dimensions
             listing.listing_id,
-            listing.is_orphan_listing
+            listing.is_deleted
         facts
             listing.amenity_count,
             listing.achieved_nightly_rate,
@@ -112,7 +112,7 @@ select
     round(avg(occupancy_rate), 4) as avg_occupancy_rate,
     round(avg(total_revenue), 2) as avg_revenue
 from listing_facts
-where not is_orphan_listing
+where not is_deleted
 group by all
 order by amenity_count_band
     {%- endset -%}

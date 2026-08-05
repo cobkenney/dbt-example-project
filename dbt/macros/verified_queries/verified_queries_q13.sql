@@ -41,7 +41,7 @@ from semantic_view(
         listing.avg_revenue_per_listing,
         listing.avg_review_score
     dimensions listing.is_shared_bathroom
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by is_shared_bathroom
     {%- endset -%}
@@ -58,7 +58,7 @@ from semantic_view(
     dimensions
         listing.room_type,
         listing.is_shared_bathroom
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by room_type, is_shared_bathroom
     {%- endset -%}

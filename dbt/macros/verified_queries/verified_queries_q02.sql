@@ -25,7 +25,7 @@
     listing, so a neighborhood average there is one number wearing a plural, and
     the base belongs next to it.
 
-    is_orphan_listing is filtered out - it has a NULL neighborhood and would
+    is_deleted is filtered out - it has a NULL neighborhood and would
     otherwise form a NULL group. Correct here, because the question compares an
     attribute rather than totalling revenue.
 
@@ -48,7 +48,7 @@ with endpoints as (
             daily.calendar_date
         where
             daily.calendar_date in ('2021-07-12', '2022-07-11')
-            and not daily.is_orphan_listing
+            and not daily.is_deleted
     )
 ),
 
@@ -88,7 +88,7 @@ from semantic_view(
     dimensions
         listing.neighborhood,
         daily.month_start_date
-    where not daily.is_orphan_listing
+    where not daily.is_deleted
 )
 order by neighborhood, month_start_date
     {%- endset -%}

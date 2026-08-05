@@ -45,7 +45,7 @@ from semantic_view(
         listing.neighborhood,
         listing.last_review_date,
         listing.has_reviews
-    where listing.has_reviews and not listing.is_orphan_listing
+    where listing.has_reviews and not listing.is_deleted
 )
 order by avg_days_since_last_review desc nulls last
     {%- endset -%}
@@ -61,7 +61,7 @@ from semantic_view(
         listing.total_reviews,
         listing.avg_occupancy_rate
     dimensions listing.has_reviews
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by has_reviews desc
     {%- endset -%}
@@ -73,7 +73,7 @@ with listing_facts as (
         {{ view }}
         dimensions
             listing.listing_id,
-            listing.is_orphan_listing
+            listing.is_deleted
         facts
             listing.months_since_last_review,
             listing.number_of_reviews,
@@ -95,7 +95,7 @@ select
     round(avg(occupancy_rate), 4) as avg_occupancy_rate,
     round(avg(total_revenue), 2) as avg_revenue
 from listing_facts
-where not is_orphan_listing
+where not is_deleted
 group by all
 order by staleness_band
     {%- endset -%}

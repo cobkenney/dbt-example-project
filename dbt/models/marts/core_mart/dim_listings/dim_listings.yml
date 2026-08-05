@@ -6,7 +6,7 @@ models:
       One row per listing with descriptive attributes, amenity flags, and
       lifetime performance measures. Includes listings from calendar source
       that may have been hard deleted from listings source
-      (is_orphan_listing = TRUE).
+      (is_deleted = TRUE).
     config:
       tags: ['1x_day']
     columns:
@@ -68,7 +68,7 @@ models:
           {{ doc('as_of_date') }}
 
           Present on this model so review recency can be measured without
-          reaching through host_id — the orphan listing has none. Not compared
+          reaching through host_id — the deleted listing has none. Not compared
           against anything here; the query picks the unit.
 
       - name: host_id
@@ -78,16 +78,16 @@ models:
         description: >
           {{ doc('host_name_masked') }}
 
-          NULL for the orphan listing, which has no listings row at all.
+          NULL for the deleted listing, which has no listings row at all.
 
       - name: host_since
-        description: Date the host joined the platform. NULL for the orphan listing.
+        description: Date the host joined the platform. NULL for the deleted listing.
 
       - name: host_location
         description: >
           Self-reported host location, free text and not normalized. Not
           comparable to `neighborhood`, which describes the listing. NULL for
-          the orphan listing.
+          the deleted listing.
 
       - name: list_price
         description: >
@@ -95,7 +95,7 @@ models:
 
           This is the list price, not what was actually charged or earned — see
           `avg_nightly_price` for the calendar-based rate and `total_revenue`
-          for realized revenue. NULL for the orphan listing.
+          for realized revenue. NULL for the deleted listing.
 
       - name: amenity_count
         description: "{{ doc('amenity_count') }}"
@@ -160,8 +160,8 @@ models:
           booked_nights / calendar_days, using div0 so a listing with no
           calendar rows yields 0 rather than erroring. Ranges 0-1.
 
-      - name: is_orphan_listing
-        description: "{{ doc('is_orphan_listing') }}"
+      - name: is_deleted
+        description: "{{ doc('is_deleted') }}"
     data_tests:
       # The reconciliation worth keeping. booked_nights and available_nights are
       # counted independently with count_if, so this catches a NULL is_available

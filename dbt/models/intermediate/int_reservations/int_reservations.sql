@@ -6,7 +6,7 @@ with booked_nights as (
         calendar_date,
         price,
         revenue,
-        is_orphan_listing
+        is_deleted
     from {{ ref('int_listing_daily') }}
     where reservation_id is not null
 
@@ -41,7 +41,7 @@ reservations as (
         count(*) as nights,
         sum(booked_nights.revenue) as reservation_revenue,
         avg(booked_nights.price) as avg_nightly_price,
-        boolor_agg(booked_nights.is_orphan_listing) as is_orphan_listing
+        boolor_agg(booked_nights.is_deleted) as is_deleted
     from booked_nights
     group by all
 
@@ -59,7 +59,7 @@ flagged as (
         reservations.nights,
         reservations.reservation_revenue,
         reservations.avg_nightly_price,
-        reservations.is_orphan_listing,
+        reservations.is_deleted,
 
         -- min/max collapse a reservation to one span, which is only honest if
         -- its nights are consecutive. This makes the assumption checkable

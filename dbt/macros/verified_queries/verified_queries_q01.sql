@@ -6,8 +6,8 @@
     one query under different phrasings, because QUESTION is the surface a
     natural-language client matches an asked question against.
 
-    THE ORPHAN LISTING IS DELIBERATELY LEFT IN. This is a revenue total, and an
-    orphan carries real booked revenue. The orphan here also has air
+    THE DELETED LISTING IS DELIBERATELY LEFT IN. This is a revenue total, and an
+    deleted listing carries real booked revenue. The deleted listing here also has air
     conditioning, so filtering it out strips revenue from the AC segment and
     pushes the no-AC share up - a different answer to the question
     asked, from a filter that looks like hygiene. The comparison here is on an

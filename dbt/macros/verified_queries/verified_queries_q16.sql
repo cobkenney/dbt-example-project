@@ -126,7 +126,7 @@ from semantic_view(
         daily.listing_id,
         listing.listing_name,
         listing.room_type
-    where not daily.is_orphan_listing
+    where not daily.is_deleted
 )
 order by avg_minimum_nights desc
     {%- endset -%}

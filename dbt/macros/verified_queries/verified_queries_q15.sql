@@ -23,7 +23,7 @@
     METRIC here rather than a fact - so the CTE wrap is to band an aggregate,
     not to dodge the facts-with-metrics restriction.
 
-    is_orphan_listing is not filtered from the per-listing entries: an orphan has
+    is_deleted is not filtered from the per-listing entries: a deleted listing has
     a price series like any other listing and the grouping key is listing_id, so
     its NULL attributes never surface. The room-type cross does filter them.
 
@@ -101,7 +101,7 @@ with per_listing as (
             daily.listing_id,
             listing.listing_name,
             listing.room_type
-        where not daily.is_orphan_listing
+        where not daily.is_deleted
     )
 )
 

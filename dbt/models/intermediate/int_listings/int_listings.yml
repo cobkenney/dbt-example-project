@@ -69,7 +69,7 @@ models:
         description: >
           {{ doc('host_id') }}
 
-          NULL for orphan listings, which have no `listings` row and therefore
+          NULL for deleted listings, which have no `listings` row and therefore
           no host. That is why a host-grouped total cannot reconcile with a
           listing-grouped one.
 
@@ -77,10 +77,10 @@ models:
         description: >
           {{ doc('host_name_masked') }}
 
-          NULL for orphan listings.
+          NULL for deleted listings.
 
       - name: host_since
-        description: Date the host joined the platform. NULL for orphan listings.
+        description: Date the host joined the platform. NULL for deleted listings.
 
       - name: host_location
         description: "{{ doc('host_location') }}"
@@ -93,11 +93,11 @@ models:
 
 
           This is the list price, not what was charged or earned. NULL for
-          orphan listings.
+          deleted listings.
 
-      - name: is_orphan_listing
+      - name: is_deleted
         description: >
-          {{ doc('is_orphan_listing') }}
+          {{ doc('is_deleted') }}
 
           Computed here, once, and read downstream rather than recomputed —
           which is the main reason this model exists.

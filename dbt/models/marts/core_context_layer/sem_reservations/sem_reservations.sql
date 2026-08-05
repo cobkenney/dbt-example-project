@@ -21,7 +21,7 @@ RELATIONSHIPS (
     reservation_to_listing AS reservation (listing_id)
         REFERENCES listing (listing_id),
 
-    -- An orphan listing has a NULL host_id, so its reservations drop out of any
+    -- A deleted listing has a NULL host_id, so its reservations drop out of any
     -- host-grouped total. They are real bookings carrying real revenue.
     listing_to_host AS listing (host_id) REFERENCES host (host_id)
 )
@@ -48,7 +48,7 @@ DIMENSIONS (
 
     reservation.listing_name AS reservation.listing_name
         WITH SYNONYMS = ('name', 'title')
-        COMMENT = 'Listing title, denormalized onto the fact. NULL for an orphan listing.',
+        COMMENT = 'Listing title, denormalized onto the fact. NULL for a deleted listing.',
 
     reservation.check_in_date AS reservation.check_in_date
         WITH SYNONYMS = ('arrival', 'start date')
@@ -82,7 +82,7 @@ DIMENSIONS (
     reservation.is_contiguous AS reservation.is_contiguous
         COMMENT = 'True where every night between check-in and the last night is occupied by this reservation, with no gap.',
 
-    reservation.is_orphan_listing AS reservation.is_orphan_listing
+    reservation.is_deleted AS reservation.is_deleted
         COMMENT = 'True for reservations on a listing that has no listings row, so its descriptive columns are all NULL. Filter out when comparing attributes; LEAVE IN when totalling revenue or counting bookings.',
 
     listing.neighborhood AS listing.neighborhood
@@ -119,7 +119,7 @@ DIMENSIONS (
         COMMENT = 'Number of amenities on the listing.',
 
     host.is_multi_listing_host AS host.is_multi_listing_host
-        COMMENT = 'True where the host holds more than one listing, which is a small minority of hosts. Grouping by this drops orphan listings, which have no host.',
+        COMMENT = 'True where the host holds more than one listing, which is a small minority of hosts. Grouping by this drops deleted listings, which have no host.',
 
     host.host_tenure_years AS host.host_tenure_years
         COMMENT = 'Whole years between the host joining and the snapshot end, never current_date.'
@@ -175,7 +175,7 @@ METRICS (
         COMMENT = 'Distinct listings with at least one booking in the slice. FEWER than the total listing count - a few listings were never booked at all.',
 
     reservation.hosts AS count(distinct reservation.host_id)
-        COMMENT = 'Distinct hosts with at least one booking. Excludes orphan listings, whose host_id is NULL.'
+        COMMENT = 'Distinct hosts with at least one booking. Excludes deleted listings, whose host_id is NULL.'
 )
 
 COMMENT = 'Rental bookings: volume, length of stay, and booking value at one row per reservation. Use this for how many bookings, how long people stay, and what a booking is worth. For anything by specific date or month-over-month pricing use SEM_LISTING_DAILY. CANNOT ANSWER: cancellation rate, booking conversion, and booking lead time or pace - these reservations are derived from occupied calendar nights, so unconfirmed and cancelled bookings are invisible and no booking-created timestamp exists in the source. Repeat-guest questions are also impossible: reservation_id identifies a booking, not a guest, and there is no guest identity in the data.'

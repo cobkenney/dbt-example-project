@@ -28,6 +28,6 @@ select
     has_lockbox,
     has_first_aid_kit,
     amenity_count,
-    is_orphan_listing
+    is_deleted
 
 from daily

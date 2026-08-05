@@ -101,7 +101,7 @@ Four properties of this data that will make a reasonable-looking query wrong.
   Grouping on `reservation_id` alone merges them into one impossible two-night
   reservation across two properties.
 - **Listing 276450 has no `listings` row** but appears in 367 calendar and
-  changelog rows. It carries `is_orphan_listing = true` through every model, and
+  changelog rows. It carries `is_deleted = true` through every model, and
   its descriptive columns are NULL. Filter it out of anything comparing
   attributes; leave it in when totalling revenue.
 - **`bedrooms` and `beds` fail in opposite ways.** `bedrooms` is NULL on 8 of 49

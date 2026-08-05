@@ -36,7 +36,7 @@ from semantic_view(
         listing.avg_occupancy_rate,
         listing.avg_achieved_rate
     dimensions listing.accommodates
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by accommodates
     {%- endset -%}
@@ -54,7 +54,7 @@ from semantic_view(
         listing.listing_name,
         listing.accommodates,
         listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_revenue_per_guest desc
     {%- endset -%}
@@ -68,7 +68,7 @@ from semantic_view(
         listing.avg_revenue_per_guest,
         listing.avg_revenue_per_listing
     dimensions listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by avg_revenue_per_guest desc
     {%- endset -%}

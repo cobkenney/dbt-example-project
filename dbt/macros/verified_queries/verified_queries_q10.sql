@@ -27,9 +27,9 @@
     Friday night stay is priced as a weekend night in practice and counts as
     midweek here.
 
-    No orphan filter on the day-of-week entries: they group on a date attribute,
-    not a listing attribute, and a revenue total should include the orphans.
-    The room-type cross does filter them, since room_type is NULL for an orphan.
+    No is_deleted filter on the day-of-week entries: they group on a date attribute,
+    not a listing attribute, and a revenue total should include the deleted listings.
+    The room-type cross does filter them, since room_type is NULL for a deleted listing.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the
     single-quoted SQL literal each is emitted into.
@@ -95,7 +95,7 @@ with by_day as (
         dimensions
             daily.day_of_week,
             listing.room_type
-        where not daily.is_orphan_listing
+        where not daily.is_deleted
     )
 )
 

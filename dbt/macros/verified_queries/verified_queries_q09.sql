@@ -78,7 +78,7 @@ from semantic_view(
         listing.listing_id,
         listing.listing_name,
         listing.room_type
-    where not listing.is_orphan_listing
+    where not listing.is_deleted
 )
 order by portfolio_revenue desc
     {%- endset -%}

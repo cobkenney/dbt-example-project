@@ -72,7 +72,7 @@ final as (
         div0(
             daily_rollup.booked_nights, daily_rollup.calendar_days
         ) as occupancy_rate,
-        listings.is_orphan_listing
+        listings.is_deleted
 
     from listings
     left join daily_rollup on listings.listing_id = daily_rollup.listing_id

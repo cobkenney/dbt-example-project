@@ -105,5 +105,5 @@ models:
       - name: amenity_count
         description: "{{ doc('amenity_count') }}"
 
-      - name: is_orphan_listing
-        description: "{{ doc('is_orphan_listing') }}"
+      - name: is_deleted
+        description: "{{ doc('is_deleted') }}"

@@ -20,7 +20,7 @@
     the two figures that are actually comparable across months, since both are
     per-night.
 
-    No orphan filter: this is a revenue total, and an orphan carries real
+    No is_deleted filter: this is a revenue total, and a deleted listing carries real
     booked revenue. Nothing here groups on a listing attribute, so its NULLs
     never form a group.
 
@@ -63,7 +63,7 @@ from semantic_view(
     dimensions
         daily.month_start_date,
         listing.neighborhood
-    where not daily.is_orphan_listing
+    where not daily.is_deleted
 )
 order by neighborhood, month_start_date
     {%- endset -%}

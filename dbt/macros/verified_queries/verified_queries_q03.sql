@@ -38,7 +38,7 @@
     across two aggregates. Neither is expressible inside SEMANTIC_VIEW.
 
     listing_name is pulled alongside listing_id rather than instead of it. An
-    orphan listing has a NULL name, and orphans are not filtered out here - they
+    deleted listing has a NULL name, and deleted listings are not filtered out here - they
     hold no lockbox flag either way, so the amenity filter already excludes them.
 
     Apostrophes are fine in either field - the dispatcher doubles them for the

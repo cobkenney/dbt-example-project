@@ -12,7 +12,7 @@
       median_length_of_stay, which exclude the censored reservations by
       construction. censored_reservations rides along so the reader can see how
       much was dropped from each group.
-    - is_orphan_listing is filtered out. An orphan has no listings row, so
+    - is_deleted is filtered out. A deleted listing has no listings row, so
       its neighborhood and room_type are NULL and it would otherwise show up as
       an unnamed group. Filtering it is correct here because the question
       compares attributes, and wrong for a revenue total.
@@ -36,7 +36,7 @@ from semantic_view(
         max_length_of_stay,
         censored_reservations
     dimensions neighborhood
-    where not is_orphan_listing
+    where not is_deleted
 )
 order by avg_length_of_stay desc
     {%- endset -%}
@@ -53,7 +53,7 @@ from semantic_view(
         max_length_of_stay,
         censored_reservations
     dimensions room_type
-    where not is_orphan_listing
+    where not is_deleted
 )
 order by avg_length_of_stay desc
     {%- endset -%}
@@ -70,7 +70,7 @@ from semantic_view(
     dimensions
         neighborhood,
         room_type
-    where not is_orphan_listing
+    where not is_deleted
 )
 order by neighborhood, room_type
     {%- endset -%}
