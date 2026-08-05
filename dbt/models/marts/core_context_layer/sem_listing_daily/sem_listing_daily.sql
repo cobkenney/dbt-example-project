@@ -78,7 +78,7 @@ DIMENSIONS (
 
     daily.is_available AS daily.is_available
         WITH SYNONYMS = ('vacant', 'open', 'bookable')
-        COMMENT = 'True when bookable on this date, false when occupied. Revenue accrues only on occupied nights. CAVEAT: false covers both booked and host-blocked - the source does not distinguish them, so occupancy treats every unavailable night as booked.',
+        COMMENT = 'True when bookable on this date, false when occupied by a booking. Revenue accrues only on occupied nights. Every unavailable night carries a reservation_id and every available night has none, asserted both ways by assert_availability_matches_reservation on stg_calendar - so occupancy measured off this column is exact, not an approximation, and filtering on reservation_id instead gives the identical set. The source records no host-blocked or owner-held dates; if it ever did, that test fails rather than occupancy quietly counting them as demand.',
 
     daily.reservation_id AS daily.reservation_id
         COMMENT = 'Booking occupying this date, NULL when available. NOT unique on its own - the same id can cover two separate stays on different listings. Count reservations in sem_reservations, not here.',
@@ -151,7 +151,7 @@ METRICS (
 
     daily.booked_nights AS count_if(not daily.is_available)
         WITH SYNONYMS = ('occupied nights', 'nights sold')
-        COMMENT = 'Nights occupied. Includes host-blocked dates, which the source cannot distinguish from bookings.',
+        COMMENT = 'Nights occupied by a booking. Equivalent to counting nights where reservation_id is not null - the two are the same set by a tested invariant, so this needs no caveat about held or blocked dates. Counts NIGHTS, never reservations: one booking spans many rows here, so use sem_reservations for booking counts.',
 
     daily.available_nights AS count_if(daily.is_available)
         WITH SYNONYMS = ('vacant nights', 'empty nights')

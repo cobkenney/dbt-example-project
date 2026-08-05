@@ -52,7 +52,3 @@ models:
 
       - name: maximum_nights
         description: "{{ doc('maximum_nights') }}"
-    data_tests:
-      - dbt_utils.expression_is_true:
-          arguments:
-            expression: "not (is_available and reservation_id is not null)"

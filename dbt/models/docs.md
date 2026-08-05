@@ -221,6 +221,19 @@ the marts is anchored to.
 {% docs is_available %}
 True when the listing is bookable on this date, false when it is already
 reserved. Revenue accrues only on unavailable (booked) nights.
+
+Exactly equivalent to `reservation_id is null`, in both directions: no available
+night carries a booking, and no unavailable night lacks one.
+`assert_availability_matches_reservation` on stg_calendar asserts the pair as a
+single `iff` and errors if either half breaks.
+
+That equivalence is what makes occupancy measured off this column exact rather
+than an upper bound — there are no host-blocked or owner-held nights mixed into
+the false rows. The distinction between "booked" and "blocked" is genuinely
+unanswerable from this source (see README), but that is because the source
+records no blocks at all, NOT because it conflates them with bookings. Those two
+read alike and are opposite: the first leaves occupancy correct, the second would
+inflate it.
 {% enddocs %}
 
 {% docs as_of_date %}

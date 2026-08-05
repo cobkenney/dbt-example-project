@@ -65,12 +65,16 @@ Stated explicitly so nobody spends a day discovering them.
 - **Booking lead time and booking pace.** There is no booking-created timestamp,
   only the nights a reservation occupies. "How far ahead do people book" needs
   new source data, not a new model.
-- **Host-blocked vs booked.** `is_available = false` covers both "booked" and
-  "host blocked the date." `reservation_id` separates them only insofar as the
-  loader populated it for every real booking. Occupancy currently treats every
-  unavailable night as booked — defensible given the
-  `is_available = true ⟺ reservation_id is null` invariant holds, but it means
-  host-blocked dates are indistinguishable by construction.
+- **Host-blocked vs booked.** The source records no host blocks at all, so
+  "how many nights did hosts hold back" has no answer here. What it does *not*
+  mean is that blocks are hiding inside `is_available = false`: the
+  `is_available = true ⟺ reservation_id is null` invariant holds in both
+  directions and is tested as one `iff` by
+  `assert_availability_matches_reservation`, so every unavailable night carries
+  a booking and **occupancy is exact, not an upper bound**. Worth stating
+  plainly because the semantic view once documented the opposite — that false
+  mixed bookings with blocks — which would have made every occupancy figure an
+  overstatement. Missing dimension, not a contaminated one.
 - **Amenity change impact over time.** 42 listings gained AC between their two
   changelog events, but every event predates the calendar window (latest
   2021-07-06; the window opens 2021-07-12). There is no before/after period
