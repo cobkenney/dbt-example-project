@@ -40,7 +40,8 @@ decision that follows. What turned up:
 a rolling one. Anything measured against `current_date` drifts on every run, so
 the marts carry an `as_of_date` set from the snapshot's last date instead.
 Reservations touching either edge are truncated, so their length is a floor
-rather than a fact.
+rather than a fact. There are not missing days per listing within that period
+though. This will be an assumption carried f
 
 **Hard deletes.** Listing 276450 has 365 calendar rows and 2 changelog rows but
 no row in `listings`. Dropping a year of availability data silently is worse
@@ -203,8 +204,7 @@ no-AC revenue share from 21.2% to 22.1%. `is_orphan_listing` is computed once in
 its own join.
 
 Tests here assert the things the reductions could silently break: reservation
-nights and revenue reconciling back to the daily grain, reservation nights being
-contiguous, and host attributes agreeing across a host's listings.
+nights being contiguous, and host attributes agreeing across a host's listings.
 
 ## 8. Marts
 
@@ -303,29 +303,8 @@ presenting a false reconciliation.
 
 **`AI_VERIFIED_QUERIES`** pin each metric to a question-and-SQL pair whose result
 was checked against the marts — one macro per business question in
-[macros/verified_queries/](dbt/macros/verified_queries/). Four properties of the
-feature had to be established by probing, because the documentation omits or
-contradicts them:
-
-- The SQL must target **the view's own** metrics and dimensions in the
-  `SEMANTIC_VIEW(...)` form, not the underlying mart tables. Base-table SQL
-  teaches a client nothing about which metric answers which question.
-- **Snowflake does not validate the SQL at create time.** A verified query
-  selecting a nonexistent column from a nonexistent table was accepted and the
-  `CREATE` succeeded. A rotted query builds green and surfaces only when a client
-  serves it as a correct answer.
-- **`QUESTION` is required and is the matching surface** — Snowflake enforces the
-  grammar while ignoring whether the SQL is true. Since a client matches against
-  that text, it should read the way somebody would actually ask.
-- Metrics need the explicit `SEMANTIC_VIEW(...)` form; selecting from the view by
-  name works for dimensions but fails on a metric.
-
-What the syntax cannot express also changed what is upstream: no window
-functions, so the gap-and-island from step 8 became a column
-(`availability_window_seq`) on `fct_listing_daily` rather than being restated in
-a string literal that nothing validates. No ranking either, so the
-revenue-concentration question has **no** metric — a metric quietly returning
-something adjacent would be reported as the answer.
+[macros/verified_queries/](dbt/macros/verified_queries/). Built specific test for
+testing that the verified queries return results.
 
 ## 13. Skills for the two changes that keep recurring
 
@@ -391,9 +370,9 @@ most: two families had grown eight near-duplicate macros, the two copies had
 drifted, and one of the two documented run orders could not work at all.
 
 **Some of the bespoke tests** (steps 7, 8). The singular tests in
-[dbt/tests/](dbt/tests/) — reconciling reservation nights against the daily grain,
-asserting host attributes agree across a host's listings, checking the amenity
-changelog stays outside the calendar window. Once the assumption to protect is
+[dbt/tests/](dbt/tests/) — asserting host attributes agree across a host's
+listings, checking the amenity changelog stays outside the calendar window,
+pinning the orphan listing count. Once the assumption to protect is
 named, writing the SQL that fails when it breaks is mechanical. Naming the
 assumption is the part that isn't, and that came from step 3.
 

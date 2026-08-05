@@ -19,6 +19,13 @@
 
     ENTRIES SHARING SQL ARE RUN ONCE.
 
+    WHY tests/generic/ AND NOT macros/. dbt resolves a generic test from either
+    path, so this is convention rather than a requirement — the reason to prefer
+    it is that `tests/` is where somebody looks for a test, and a bare `tests/`
+    file would be read as a singular test. It is a sibling of the assert_*
+    singular tests it belongs with, not of the query macros it calls. Those stay
+    in macros/verified_queries/, since the DDL needs them too.
+
 #}
 {% test verified_queries_run(model, question) %}
 

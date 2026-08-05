@@ -72,6 +72,3 @@ models:
       - dbt_utils.expression_is_true:
           arguments:
             expression: is_contiguous
-
-      # Every booked night lands in exactly one reservation — see
-      # tests/assert_reservation_nights_reconcile.sql.

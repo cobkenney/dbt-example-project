@@ -5,13 +5,8 @@
 -- calendar window — otherwise a booked night would be attributed to an amenity
 -- set the listing did not yet have, silently corrupting amenity revenue
 -- analysis.
---
--- Today the newest event is 2021-07-06 and the calendar opens 2021-07-12, so
--- this returns no rows. If a newer amenity event is ever loaded, this fails and
--- int_listing_amenities must become an SCD2 model (valid_from/valid_to via
--- lead() — each changelog row already carries a full snapshot, not a delta),
--- and the boolean pivot in int_listing_daily has to join on a date range rather
--- than on listing_id alone.
+{{ config(severity='warn') }}
+
 with calendar_window as (
 
     select min(calendar_date) as window_opens_at

@@ -1,9 +1,9 @@
 {#
     Maps a question name to its verified-query macro and returns that macro's
     entries. One branch per question, and the only place the mapping lives —
-    both ai_verified_queries() and the verified_queries_run test come through
-    here, so a question name is resolved the same way whether it is being
-    emitted into DDL or executed against the warehouse.
+    both ai_verified_queries() and the verified_queries_run test — which lives in
+    tests/generic/ — come through here, so a question name is resolved the same
+    way whether it is being emitted into DDL or executed against the warehouse.
 
     A HAND-WRITTEN IF-CHAIN, WHICH LOOKS LIKE THE WRONG ANSWER. The obvious
     version is `context['verified_queries_' ~ question](view=view)`, and that is

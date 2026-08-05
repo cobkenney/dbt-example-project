@@ -17,6 +17,42 @@ models:
       `count(distinct listing_id)` by neighborhood is a metric.
 
       Descriptions here do not reach Snowflake; the `COMMENT` clauses in the DDL
-      do. See `sem_listing_daily.yml` for why there are no column docs or tests.
+      do. See `sem_listing_daily.yml` for why there are no column docs, and why
+      `verified_queries_run` is the one test these views carry.
     config:
       tags: ['1x_day']
+
+    data_tests:
+      - verified_queries_run:
+          arguments:
+            question: q04
+      - verified_queries_run:
+          arguments:
+            question: q05
+      - verified_queries_run:
+          arguments:
+            question: q07
+      - verified_queries_run:
+          arguments:
+            question: q08
+      - verified_queries_run:
+          arguments:
+            question: q09
+      - verified_queries_run:
+          arguments:
+            question: q11
+      - verified_queries_run:
+          arguments:
+            question: q12
+      - verified_queries_run:
+          arguments:
+            question: q13
+      - verified_queries_run:
+          arguments:
+            question: q14
+      - verified_queries_run:
+          arguments:
+            question: q24
+      - verified_queries_run:
+          arguments:
+            question: q26

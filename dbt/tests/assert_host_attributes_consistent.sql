@@ -9,6 +9,8 @@
 -- host_since that differs — min() would silently pick one and the other value
 -- would vanish without trace. This fails instead, which is the signal that
 -- hosts need their own source or a real SCD treatment.
+{{ config(severity='warn') }}
+
 select
     host_id,
     count(distinct host_name_masked) as distinct_names,

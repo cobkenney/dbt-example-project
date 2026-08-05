@@ -15,6 +15,18 @@ models:
       construction, which is the one thing most likely to be got wrong by hand.
 
       Descriptions here do not reach Snowflake; the `COMMENT` clauses in the DDL
-      do. See `sem_listing_daily.yml` for why there are no column docs or tests.
+      do. See `sem_listing_daily.yml` for why there are no column docs, and why
+      `verified_queries_run` is the one test these views carry.
     config:
       tags: ['1x_day']
+
+    data_tests:
+      - verified_queries_run:
+          arguments:
+            question: q17
+      - verified_queries_run:
+          arguments:
+            question: q22
+      - verified_queries_run:
+          arguments:
+            question: q23
