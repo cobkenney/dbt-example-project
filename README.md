@@ -404,9 +404,9 @@ first ten ideas. Each question then had to be checked against the marts as built
 which is where several moved from "answerable" to "needs a new model" or into the
 cannot-answer list.
 
-**Documentation**, including this file and [dbt/models/README.md](dbt/models/README.md).
-Written with AI from the actual code and the actual query results, not from
-memory — which matters, because that is the failure mode.
+**Documentation**, including this file written with AI from the actual code and the
+actual query results, not from memory — which matters, because that is the failure
+mode.
 
 ---
 
@@ -414,7 +414,6 @@ memory — which matters, because that is the failure mode.
 
 | Path | What is there |
 |---|---|
-| [dbt/models/README.md](dbt/models/README.md) | Every model, why it exists, and the cleaning log |
 | [BUSINESS_QUESTIONS.md](BUSINESS_QUESTIONS.md) | 26 questions, what they take, and what this source cannot answer |
 | [dbt/models/staging/](dbt/models/staging/) | Cast, dedupe, rename — one model per source table, views |
 | [dbt/models/intermediate/](dbt/models/intermediate/) | Flatten, join, reduce grain — tables |
@@ -442,6 +441,9 @@ gets a missing-relation error.
 ---
 
 ## Next steps
+
+**Orchestration tool** Use something like airflow or dbt Cloud to run these models
+at an appropriate cadence. Assuming at least 1x day.
 
 **Maximize the context layer, and test it for real.** The whole layer rests on a
 premise that is currently untested: that a natural-language client reads the

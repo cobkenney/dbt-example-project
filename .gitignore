@@ -440,5 +440,6 @@ logs/
 # Local credentials (never commit)
 .env
 
-# Claude local settings
+# Claude settings
 .claude/settings.local.json
+.claude/settings.json

@@ -140,9 +140,9 @@ list. Follow `verified_queries_q13.sql` as the model. What matters:
   clause.
 - Apostrophes are fine here, unlike in `COMMENT` — the dispatcher doubles them.
 - **Snowflake does not validate the SQL at create time.** A query against a
-  nonexistent column builds green. So pin the result to a figure from `analyses/`
-  where one exists, and tell the user the query is unvalidated until it has been
-  run.
+  nonexistent column builds green. So run the query against the mart to get the
+  figure, record it in the macro header, and tell the user the query is
+  unvalidated until it has been run through the view itself.
 
 ## Verify before reporting done
 

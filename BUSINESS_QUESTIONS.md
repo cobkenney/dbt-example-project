@@ -6,8 +6,9 @@ source data cannot answer at any amount of modeling effort. A last section
 lists the properties of this data that make a reasonable-looking query wrong.
 
 Nothing here is a finding. Figures appear only where they identify the rows a
-question would return — verified results live in
-[dbt/models/README.md](dbt/models/README.md) and `dbt/analyses/`.
+question would return. Each question's verified result is pinned by its macro in
+[dbt/macros/verified_queries/](dbt/macros/verified_queries/), whose header records
+why the query is shaped the way it is.
 
 Column names are checked against the marts as built.
 
@@ -27,7 +28,7 @@ One query against the marts, no new modeling.
 |---|---|---|---|
 | 1 | Share of monthly revenue from listings without AC | Amenity gaps that cost money | `fct_listing_daily` — `revenue` by `month_start_date`, split on `has_air_conditioning` |
 | 2 | Neighborhood average price increase | Where rates are moving | `fct_listing_daily` — `price` by `neighborhood` over `calendar_date` |
-| 3 | Longest possible stay for a lockbox + first-aid-kit renter | Long-stay inventory for a picky renter | `fct_listing_daily` + `dim_listings`. Needs a gap-and-island to find contiguous available runs — see `analyses/03_long_stay_picky_renter.sql`, and read its header before adapting it |
+| 3 | Longest possible stay for a lockbox + first-aid-kit renter | Long-stay inventory for a picky renter | `fct_listing_daily` + `dim_listings`. Group on `availability_window_seq`, filtering `is_available` first — see `macros/verified_queries/verified_queries_q03.sql`, and read its header before adapting it |
 | 4 | Occupancy rate by neighborhood and room type | Where demand concentrates vs where supply sits | `dim_listings` — `occupancy_rate` by `neighborhood`, `room_type` |
 | 5 | Which listings earned zero revenue all year | 3 listings were available 365 days and never booked — price, photos, or location? | `dim_listings` — `total_revenue = 0` |
 | 6 | Revenue seasonality across the portfolio | Staffing, cleaning contracts, pricing floors | `fct_listing_daily` — `revenue` by `month_start_date` |
@@ -81,8 +82,8 @@ Stated explicitly so nobody spends a day discovering them.
 - **Anything about a host's real name.** `host_name` is PII and is masked at the
   staging boundary; only `host_name_masked` exists downstream. Two of the 36
   hosts share a name and therefore share a hash, so it is not a host identifier
-  either — join on `host_id`. See the PII section in
-  [dbt/models/README.md](dbt/models/README.md).
+  either — join on `host_id`. See [dbt/macros/infrastructure/mask_pii.sql](dbt/macros/infrastructure/mask_pii.sql)
+  and step 11 of the [README](README.md).
 
 ## Known caveats that change answers
 

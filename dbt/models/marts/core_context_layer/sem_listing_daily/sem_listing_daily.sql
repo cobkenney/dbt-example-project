@@ -271,8 +271,9 @@ AI_SQL_GENERATION 'The calendar is a fixed snapshot, not a rolling window. NEVER
     fct_listing_daily carries it, so availability_window_seq is an ordinary
     dimension and the window is a GROUP BY. Both queries are still CTE-wrapped -
     the aggregation is two-level and the clamp is arithmetic across aggregates -
-    but they no longer restate the window function. See models/README.md,
-    "Collapsed models".
+    but they no longer restate the window function. The rules the column does NOT
+    encode are in macros/verified_queries/verified_queries_q03.sql; the clamp
+    premise is held by tests/assert_stay_cap_binds.sql.
 
     The other CTE wraps are the familiar two reasons. Questions 16 and 21 band or
     count over FACTS - minimum_nights, price_per_bedroom - and Snowflake rejects

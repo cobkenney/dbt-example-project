@@ -2,9 +2,9 @@
 --
 -- An orphan is a listing the calendar references that has no stg_listings
 -- row, so every descriptive column is NULL for it. The count is load-bearing
--- across the project — models/README.md, the semantic view COMMENTs, and the
--- revenue reconciliation that explains how the orphan gap could result in the
--- host view being short.
+-- across the project — the semantic view COMMENTs, and the revenue
+-- reconciliation that explains how the orphan gap could result in the host view
+-- being short.
 --
 -- Pinned at one rather than asserted as "at least one" because both
 -- directions are worth knowing about:
