@@ -76,11 +76,6 @@ models:
         description: >
           Numeric bathroom count parsed from bathrooms_text.
 
-          No range test: implausible values have shown up in the raw table
-          (a "60 baths" outlier), but on NULL-id rows this model filters out.
-          A bound here would assert something about the source that the source
-          does not guarantee.
-
       - name: is_shared_bathroom
         description: >
           True when bathrooms_text mentions "shared". A shared bathroom is not

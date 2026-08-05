@@ -18,17 +18,10 @@ renamed as (
         listing_id,
         date as calendar_date,
         available as is_available,
-
-        -- The loader wrote the string 'NULL' rather than a true NULL.
         nullif(reservation_id, 'NULL') as reservation_id,
-
-        -- Plain numeric string here, e.g. "125" — unlike listings.price,
-        -- which carries a "$" prefix.
         try_cast(price as number(10, 2)) as price,
-
         minimum_nights,
         maximum_nights
-
     from deduplicated
 
 )
