@@ -4,12 +4,7 @@ models:
   - name: int_reservations
     description: >
       One row per reservation, reduced from the daily calendar by grouping
-      occupied nights on reservation_id. Materialized as a table like every
-      other intermediate model — see dbt_project.yml.
-
-      Derived from the calendar rather than a reservations source, so it holds
-      confirmed stays only — see the header comment in the .sql for what that
-      omits.
+      occupied nights on reservation_id.
     config:
       tags: ['1x_day']
     columns:

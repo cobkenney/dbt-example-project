@@ -4,18 +4,13 @@ models:
   - name: int_listing_daily
     description: >
       One row per listing per date, joining calendar to listing attributes and
-      amenity flags. The daily grain every mart aggregates from. Left joins
-      preserve the orphan listings' calendar rows, which carry real booked
-      revenue that an inner join would silently drop.
+      amenity flags.
     config:
       tags: ['1x_day']
     columns:
       - name: calendar_id
         description: "{{ doc('calendar_id') }}"
         data_tests:
-          # This model left joins int_listings and the amenity pivot, so a
-          # duplicate key here means one of those join keys stopped being unique
-          # and the daily grain fanned out.
           - unique
 
       - name: listing_id
@@ -95,16 +90,6 @@ models:
           amenity names without a schema change, which the generated columns do
           not.
 
-      # The generated amenity flags. The loop that builds them lives in this
-      # model's .sql, and this list is generated rather than hand-maintained —
-      # see the wake-up-ae skill.
-      #
-      # Only the six the marts expose carry curated descriptions from docs.md;
-      # the rest follow the same has_<slugified_amenity_name> pattern. The column
-      # list comes from seeds/known_amenity_names.csv, so a new amenity upstream
-      # adds nothing until that seed is regenerated — and the marts downstream
-      # name the flags they carry rather than selecting them in bulk, so a flag
-      # reaches them only when someone edits them too.
       - name: has_air_conditioning
         description: "{{ doc('has_air_conditioning') }}"
 

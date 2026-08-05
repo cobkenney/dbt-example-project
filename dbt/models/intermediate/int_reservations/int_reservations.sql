@@ -1,16 +1,3 @@
--- One row per reservation — a grain reduction of the daily calendar.
---
--- This should most likely come from a source, but in the absence of a source,
--- we will use listings. This most likely means we are missing unconfirmed
--- reservations vs the reservations on listings are confirmed. A reservations
--- model would be key to this mart for understanding easily things like how many
--- reservations did we have, what is the avg length of stay, etc.
---
--- Concretely: reservation_id reaches this model through stg_calendar, where the
--- loader's literal 'NULL' string was converted to a true NULL. An occupied
--- night is the only evidence a reservation exists, so nothing here can see a
--- reservation that was requested and never confirmed, one that was cancelled,
--- or a date the host blocked for themselves.
 with booked_nights as (
 
     select
@@ -27,9 +14,7 @@ with booked_nights as (
 
 calendar_window as (
 
-    -- Snapshot boundaries, derived rather than hardcoded. A reservation
-    -- touching either edge is censored: its remaining nights fall outside the
-    -- loaded year, so its length is a floor rather than a fact.
+    -- Snapshot boundaries, derived rather than hardcoded
     select
         min(calendar_date) as window_start_date,
         max(calendar_date) as window_end_date
@@ -43,29 +28,19 @@ reservations as (
         -- Surrogate key over the real grain, following the same pattern as
         -- calendar_id. Needed because reservation_id is NOT unique on its own:
         -- the same id can appear on two different listings, covering two
-        -- separate stays. Grouping on reservation_id alone would have merged
-        -- them into one impossible reservation spanning two properties.
+        -- separate stays.
         {{ dbt_utils.generate_surrogate_key([
             'listing_id', 'reservation_id'
         ]) }} as reservation_key,
 
         booked_nights.reservation_id,
         booked_nights.listing_id,
-
         min(booked_nights.calendar_date) as check_in_date,
-
-        -- Last night slept and the morning the guest leaves. Both are kept
-        -- because "nights sold" and "date the unit frees up" are different
-        -- questions — housekeeping cares about the second one.
         max(booked_nights.calendar_date) as last_night_date,
         dateadd(day, 1, max(booked_nights.calendar_date)) as check_out_date,
-
         count(*) as nights,
         sum(booked_nights.revenue) as reservation_revenue,
         avg(booked_nights.price) as avg_nightly_price,
-
-        -- boolor_agg, not max: Snowflake's max() rejects booleans. Constant
-        -- per listing, so any aggregate would do.
         boolor_agg(booked_nights.is_orphan_listing) as is_orphan_listing
     from booked_nights
     group by all

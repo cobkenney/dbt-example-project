@@ -4,33 +4,7 @@ models:
   - name: int_listings
     description: >
       One row per listing the project recognises — a superset of `stg_listings`,
-      which is missing listings the calendar references. Descriptive attributes
-      only: no measures, no raw JSON.
-
-
-      Exists to hold two things that were previously duplicated. The GRAIN, set by
-      driving off the amenities bridge so orphan listings are present rather than
-      silently dropped; and `is_orphan_listing`, which was computed independently
-      in `int_listing_daily` and again in `dim_listings` — two copies of the rule
-      deciding which listings lack attributes, in two layers, with nothing tying
-      them together.
-
-
-      Four models read `stg_listings` directly before this one existed, each
-      taking its own column subset. That was defensible while nothing was shared;
-      the orphan rule is what made it not.
-
-
-      NOT a copy of `stg_listings`. The raw JSON columns (`host_verifications`,
-      `amenities`) stay upstream — each has a dedicated flattening path, and
-      carrying them here would offer a second route to the same array and invite
-      the wrong one. `int_host_verifications` still refs `stg_listings` for
-      exactly that reason, and correctly so.
-
-
-      No measures either. Revenue, occupancy and nightly rates are
-      calendar-derived and live in `int_listing_daily`; two homes for a
-      listing-grain measure would mean no rule for choosing between them.
+      which is missing listings the calendar references.
     config:
       tags: ['1x_day']
     columns:
@@ -127,8 +101,3 @@ models:
 
           Computed here, once, and read downstream rather than recomputed —
           which is the main reason this model exists.
-
-    # The grain claim is pinned by tests/assert_orphan_listing_count.sql — a
-    # singular test, because the assertion is about the model as a whole rather
-    # than about any column, and expressing an exact-rowcount claim as a generic
-    # test means smuggling a subquery into a `where` config.
