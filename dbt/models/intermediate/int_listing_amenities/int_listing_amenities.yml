@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: int_listing_amenities
+    description: >
+      One row per listing per amenity — the bridge grain, flattened out of the
+      JSON array on the changelog's latest event per listing. The amenity
+      vocabulary is enumerated in seeds/known_amenity_names.csv.
+
+
+      Just the flatten: the boolean pivot lives in int_listing_daily, where the
+      flags are consumed. Same split as int_host_verifications, which flattens
+      verifications and leaves the is_verified_* pivot to int_hosts. That is what
+      keeps the generated one-column-per-amenity surface out of this model and
+      out of anything that only needs to know which amenities a listing has.
+
+
+      Holds the CURRENT amenity set, a deliberate grain reduction rather than
+      history. The changelog does hold real history — most listings have events
+      with differing amenity sets — but every event predates the calendar
+      window, so a point-in-time join provably changes nothing — see
+      tests/assert_amenities_predate_calendar.sql, which fails if that stops
+      being true.
+
+
+      Covers every listing the calendar references, including the orphans
+      stg_listings lacks — the changelog is the driving table for exactly that
+      reason.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          Not unique here — this is a bridge, one row per amenity per listing.
+
+      - name: amenity_name
+        description: >
+          The amenity as it appears in the source array, unmodified — including
+          the Unicode apostrophes in names like "Children’s books and toys".
+          flag_name('amenity', ...) is what slugifies these into column names for the
+          pivot in int_listing_daily.
+        data_tests:
+          - not_null
+
+          # Warns when the source produces an amenity this project has not seen.
+          # The known list is a SEED, seeds/known_amenity_names.csv, rather than a
+          # wall of literal values inline — see seeds/_seeds.yml for why, and for
+          # the cost.
+          #
+          # The warning is a WORK ORDER, not a defect report: the seed decides
+          # int_listing_daily's column list, so acting on it means regenerating
+          # the seed, documenting the flag and deciding whether a mart carries it,
+          # all in one commit. The wake-up-ae skill is that procedure.
+          - relationships:
+              name: warn_new_amenity_name
+              arguments:
+                to: ref('known_amenity_names')
+                field: amenity_name
+              config:
+                severity: warn

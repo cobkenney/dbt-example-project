@@ -1,0 +1,114 @@
+version: 2
+
+models:
+  - name: fct_reservations
+    description: >
+      One row per reservation, with listing attributes and amenity flags
+      denormalized on. Answers how many reservations we had, average length of
+      stay, average booking value, and bookings per month.
+
+      Derived from occupied calendar nights rather than a reservations source,
+      so it covers confirmed stays only — cancellations, unconfirmed requests,
+      and booking lead time are not answerable from this table.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: reservation_key
+        description: >
+          {{ doc('reservation_key') }}
+
+          Primary key here.
+        data_tests:
+          - unique
+
+      - name: reservation_id
+        description: >
+          {{ doc('reservation_id') }}
+
+          NOT unique in this model — join on reservation_key instead.
+
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          Foreign key to dim_listings.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_listings')
+                field: listing_id
+
+      - name: check_in_date
+        description: "{{ doc('check_in_date') }}"
+
+      - name: last_night_date
+        description: "{{ doc('last_night_date') }}"
+
+      - name: check_out_date
+        description: "{{ doc('check_out_date') }}"
+
+      - name: check_in_month
+        description: >
+          First day of the month the reservation checked in, precomputed for
+          bookings-by-month aggregation. A stay spanning a month boundary counts
+          in the month it started.
+
+      - name: nights
+        description: "{{ doc('nights') }}"
+
+      - name: reservation_revenue
+        description: "{{ doc('reservation_revenue') }}"
+
+      - name: avg_nightly_price
+        description: >
+          Average nightly price across the reservation's nights — the rate
+          actually achieved on this booking.
+
+      - name: is_contiguous
+        description: "{{ doc('is_contiguous') }}"
+
+      - name: is_left_censored
+        description: "{{ doc('is_reservation_censored') }}"
+
+      - name: is_right_censored
+        description: "{{ doc('is_reservation_censored') }}"
+
+      - name: is_censored
+        description: >
+          True when the reservation touches either edge of the calendar
+          snapshot, so `nights` is a floor on the real stay length rather than
+          the stay length. Filter these out before reporting average length of
+          stay — including them biases the average downward.
+
+      - name: listing_name
+        description: "{{ doc('listing_name') }}"
+
+      - name: neighborhood
+        description: "{{ doc('neighborhood') }}"
+
+      - name: property_type
+        description: "{{ doc('property_type') }}"
+
+      - name: room_type
+        description: "{{ doc('room_type') }}"
+
+      - name: accommodates
+        description: "{{ doc('accommodates') }}"
+
+      - name: host_id
+        description: "{{ doc('host_id') }}"
+
+      - name: has_air_conditioning
+        description: "{{ doc('has_air_conditioning') }}"
+
+      - name: has_lockbox
+        description: "{{ doc('has_lockbox') }}"
+
+      - name: has_first_aid_kit
+        description: "{{ doc('has_first_aid_kit') }}"
+
+      - name: amenity_count
+        description: "{{ doc('amenity_count') }}"
+
+      - name: is_orphan_listing
+        description: "{{ doc('is_orphan_listing') }}"

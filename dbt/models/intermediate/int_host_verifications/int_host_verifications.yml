@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: int_host_verifications
+    description: >
+      One row per host per verification method — the bridge grain, flattened out
+      of the raw JSON array on stg_listings. The method vocabulary is enumerated
+      in seeds/known_verification_methods.csv. Materialized as a table like every
+      other intermediate model.
+
+
+      Kept alongside the generated is_verified_* flags on int_hosts because the
+      two shapes answer different questions. The flags answer "which hosts have
+      X" inside a filter; this answers "how many hosts hold each method" without
+      naming a column per method, and it does not change shape when the source
+      adds one.
+
+
+      Grouped to the host grain BEFORE flattening. Verifications are a host
+      attribute denormalized onto every listing row, so flattening stg_listings
+      directly would emit a row per listing per method and overcount every
+      multi-listing host.
+
+
+      Excludes orphan listings, which have no listings row and therefore no
+      host_id or verification array.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: host_id
+        description: >
+          {{ doc('host_id') }}
+
+          Not unique here — this is a bridge, one row per method per host.
+
+      - name: verification_method
+        description: "{{ doc('verification_method') }}"
+        data_tests:
+          # The methods pinned in seeds/known_verification_methods.csv, at WARN
+          # rather than error. A new method upstream is a source change, not a
+          # defect — so failing the build on it would be wrong, and saying nothing
+          # would mean nobody ever learns the source grew one.
+          #
+          # The warning is a WORK ORDER, not a defect report: the seed decides
+          # int_hosts' column list, so acting on it means regenerating the seed,
+          # documenting the flag and deciding whether dim_hosts carries it, all in
+          # one commit. The wake-up-ae skill is that procedure.
+          - relationships:
+              name: warn_new_verification_method
+              arguments:
+                to: ref('known_verification_methods')
+                field: verification_method
+              config:
+                severity: warn

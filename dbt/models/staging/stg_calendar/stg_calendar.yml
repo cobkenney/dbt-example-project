@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: stg_calendar
+    description: >
+      One row per listing per date. Deduplicated on (listing_id, calendar_date)
+      because the source lands duplicate rows at that grain.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: calendar_id
+        description: "{{ doc('calendar_id') }}"
+        data_tests:
+          - unique
+
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          References stg_listings.listing_id, but some rows reference a listing
+          absent from it — warns rather than errors so those rows survive into
+          int_listings, which flags them as orphans.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_listings')
+                field: listing_id
+              config:
+                severity: warn
+
+      - name: calendar_date
+        description: "{{ doc('calendar_date') }}"
+        data_tests:
+          - not_null
+
+      - name: is_available
+        description: "{{ doc('is_available') }}"
+        data_tests:
+          - not_null
+
+      - name: reservation_id
+        description: "{{ doc('reservation_id') }}"
+
+      - name: price
+        description: "{{ doc('nightly_price') }}"
+        data_tests:
+          - not_null
+
+      - name: minimum_nights
+        description: "{{ doc('minimum_nights') }}"
+
+      - name: maximum_nights
+        description: "{{ doc('maximum_nights') }}"
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "not (is_available and reservation_id is not null)"

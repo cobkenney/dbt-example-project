@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: int_reservations
+    description: >
+      One row per reservation, reduced from the daily calendar by grouping
+      occupied nights on reservation_id. Materialized as a table like every
+      other intermediate model — see dbt_project.yml.
+
+      Derived from the calendar rather than a reservations source, so it holds
+      confirmed stays only — see the header comment in the .sql for what that
+      omits.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: reservation_key
+        description: "{{ doc('reservation_key') }}"
+        data_tests:
+          - unique
+
+      - name: reservation_id
+        description: >
+          {{ doc('reservation_id') }}
+
+          NOT unique in this model — see reservation_key.
+
+      - name: listing_id
+        description: "{{ doc('listing_id') }}"
+
+      - name: check_in_date
+        description: "{{ doc('check_in_date') }}"
+
+      - name: last_night_date
+        description: "{{ doc('last_night_date') }}"
+
+      - name: check_out_date
+        description: "{{ doc('check_out_date') }}"
+
+      - name: nights
+        description: "{{ doc('nights') }}"
+
+      - name: reservation_revenue
+        description: >
+          {{ doc('reservation_revenue') }}
+
+          not_null holds because every night in this model is booked by
+          construction, so revenue is populated on all of them — the test is the
+          tripwire for that stopping being true.
+        data_tests:
+          - not_null
+
+      - name: avg_nightly_price
+        description: >
+          Average nightly price across the reservation's nights. Equal to
+          reservation_revenue / nights, since revenue is the price on every
+          booked night.
+
+      - name: is_contiguous
+        description: "{{ doc('is_contiguous') }}"
+
+      - name: is_left_censored
+        description: "{{ doc('is_reservation_censored') }}"
+
+      - name: is_right_censored
+        description: "{{ doc('is_reservation_censored') }}"
+
+      - name: is_orphan_listing
+        description: "{{ doc('is_orphan_listing') }}"
+    data_tests:
+      # The assumption min/max rests on. If an id's nights are not consecutive
+      # it covers two separate stays, and check_out_date overstates the first.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: is_contiguous
+
+      # Every booked night lands in exactly one reservation — see
+      # tests/assert_reservation_nights_reconcile.sql.

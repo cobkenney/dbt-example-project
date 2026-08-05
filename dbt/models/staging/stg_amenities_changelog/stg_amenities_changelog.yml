@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: stg_amenities_changelog
+    description: Event log of amenity changes, one row per listing per change timestamp.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: amenities_change_id
+        description: Surrogate key over (listing_id, changed_at).
+        data_tests:
+          - unique
+
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          References stg_listings.listing_id, but some rows reference a listing
+          absent from it — the same gap the calendar has. Warns rather than
+          errors so those rows survive into int_listings.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_listings')
+                field: listing_id
+              config:
+                severity: warn
+
+      - name: changed_at
+        description: >
+          When the amenity set changed. Every event predates the calendar
+          window, which is what lets int_listing_amenities collapse to each
+          listing's most recent event — asserted by
+          tests/assert_amenities_predate_calendar.sql.
+        data_tests:
+          - not_null
+
+      - name: amenities
+        description: >
+          {{ doc('amenities_json') }}
+
+          Each row holds the listing's complete amenity set as of `changed_at`,
+          a snapshot rather than a delta — so building an SCD2 view of this
+          would need only valid_from/valid_to, no reconstruction.

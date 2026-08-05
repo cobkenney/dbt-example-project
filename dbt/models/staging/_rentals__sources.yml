@@ -1,0 +1,77 @@
+version: 2
+
+sources:
+  - name: rentals
+    description: >
+      Raw Airbnb-style rental data loaded from CSV into Snowflake.
+      Landed as-is — no cleaning applied. Staging models are responsible
+      for casting and deduplication.
+    database: RENTALS
+    schema: RAW_DATA
+
+    tables:
+      - name: listings
+        description: One row per rental property listing, with host attributes denormalized onto it.
+        columns:
+          - name: id
+            description: >
+              Listing identifier. Natural key, but some rows land with a NULL
+              id — stg_listings filters them out, and asserts unique and
+              not_null on what survives.
+          - name: host_id
+            description: Identifier of the host who owns this listing.
+          - name: host_name
+            description: >
+              Host's real name. **PII — do not select this column into any
+              model.** stg_listings is the only model permitted to read it, and
+              it emits host_name_masked instead, so no dbt layer holds the
+              plaintext. See macros/mask_pii.sql.
+
+              The plaintext remains here in RAW_DATA; restricting that requires
+              a Snowflake masking policy, which dbt cannot express.
+            config:
+              meta:
+                contains_pii: true
+          - name: room_type
+            description: >
+              Either "Entire home/apt" or "Private room". stg_listings holds the
+              accepted_values test that pins that vocabulary.
+          - name: price
+            description: Nightly price as a currency string, e.g. "$125.00". Cast downstream.
+          - name: accommodates
+            description: Maximum number of guests.
+          - name: review_scores_rating
+            description: Average review score.
+
+      - name: calendar
+        description: One row per listing per date, giving availability and nightly price.
+        columns:
+          - name: listing_id
+            description: >
+              References listings.id, but some rows point at a listing absent
+              from listings. Those rows survive into stg_calendar, whose
+              warn-severity relationships test reports the current count — the
+              orphan listing that gap produces is pinned by
+              tests/assert_orphan_listing_count.sql.
+          - name: date
+            description: >
+              Calendar date the availability applies to. The extract is a fixed
+              one-year window, not a rolling one.
+          - name: available
+            description: Whether the listing is bookable on this date.
+          - name: price
+            description: Nightly price as a plain numeric string, e.g. "125" — no currency symbol, unlike listings.price.
+
+      - name: amenities_changelog
+        description: Event log of amenity changes per listing. One row per listing per change timestamp.
+        columns:
+          - name: listing_id
+            description: >
+              References listings.id, but some rows point at a listing absent
+              from listings — same gap the calendar has. Those rows survive into
+              stg_amenities_changelog, whose warn-severity relationships test
+              reports the current count.
+          - name: change_at
+            description: When the amenity set changed.
+          - name: amenities
+            description: Amenity list as a raw string.

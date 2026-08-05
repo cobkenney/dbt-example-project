@@ -1,0 +1,134 @@
+version: 2
+
+models:
+  - name: int_listings
+    description: >
+      One row per listing the project recognises — a superset of `stg_listings`,
+      which is missing listings the calendar references. Descriptive attributes
+      only: no measures, no raw JSON.
+
+
+      Exists to hold two things that were previously duplicated. The GRAIN, set by
+      driving off the amenities bridge so orphan listings are present rather than
+      silently dropped; and `is_orphan_listing`, which was computed independently
+      in `int_listing_daily` and again in `dim_listings` — two copies of the rule
+      deciding which listings lack attributes, in two layers, with nothing tying
+      them together.
+
+
+      Four models read `stg_listings` directly before this one existed, each
+      taking its own column subset. That was defensible while nothing was shared;
+      the orphan rule is what made it not.
+
+
+      NOT a copy of `stg_listings`. The raw JSON columns (`host_verifications`,
+      `amenities`) stay upstream — each has a dedicated flattening path, and
+      carrying them here would offer a second route to the same array and invite
+      the wrong one. `int_host_verifications` still refs `stg_listings` for
+      exactly that reason, and correctly so.
+
+
+      No measures either. Revenue, occupancy and nightly rates are
+      calendar-derived and live in `int_listing_daily`; two homes for a
+      listing-grain measure would mean no rule for choosing between them.
+    config:
+      tags: ['1x_day']
+    columns:
+      - name: listing_id
+        description: >
+          {{ doc('listing_id') }}
+
+          Primary key here — the grain is one row per listing, sourced from the
+          bridge rather than from `stg_listings`.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_listing_amenities')
+                field: listing_id
+
+      - name: listing_name
+        description: "{{ doc('listing_name') }}"
+
+      - name: neighborhood
+        description: "{{ doc('neighborhood') }}"
+
+      - name: property_type
+        description: "{{ doc('property_type') }}"
+
+      - name: room_type
+        description: "{{ doc('room_type') }}"
+
+      - name: accommodates
+        description: "{{ doc('accommodates') }}"
+
+      - name: bedrooms
+        description: "{{ doc('bedrooms') }}"
+
+      - name: beds
+        description: "{{ doc('beds') }}"
+
+      - name: bathrooms
+        description: >
+          Numeric bathroom count parsed from the raw free-text label. Does not
+          indicate whether the bathroom is shared — see `is_shared_bathroom`.
+
+      - name: is_shared_bathroom
+        description: >
+          True when the raw bathroom label mentions "shared". Not reflected in
+          the `bathrooms` count, so this is the only signal for it.
+
+      - name: number_of_reviews
+        description: Lifetime review count. Zero for listings that have never been reviewed.
+
+      - name: review_scores_rating
+        description: Average review score. NULL for listings with no reviews.
+
+      - name: first_review_date
+        description: Date of the earliest review. NULL for listings with no reviews.
+
+      - name: last_review_date
+        description: Date of the most recent review. NULL for listings with no reviews.
+
+      - name: host_id
+        description: >
+          {{ doc('host_id') }}
+
+          NULL for orphan listings, which have no `listings` row and therefore
+          no host. That is why a host-grouped total cannot reconcile with a
+          listing-grouped one.
+
+      - name: host_name_masked
+        description: >
+          {{ doc('host_name_masked') }}
+
+          NULL for orphan listings.
+
+      - name: host_since
+        description: Date the host joined the platform. NULL for orphan listings.
+
+      - name: host_location
+        description: "{{ doc('host_location') }}"
+
+      - name: list_price
+        description: >
+          Host's advertised nightly rate, renamed from `stg_listings.price` to the
+          name the marts already use — the staging name is ambiguous next to the
+          calendar's nightly `price`, which is a different number.
+
+
+          This is the list price, not what was charged or earned. NULL for
+          orphan listings.
+
+      - name: is_orphan_listing
+        description: >
+          {{ doc('is_orphan_listing') }}
+
+          Computed here, once, and read downstream rather than recomputed —
+          which is the main reason this model exists.
+
+    # The grain claim is pinned by tests/assert_orphan_listing_count.sql — a
+    # singular test, because the assertion is about the model as a whole rather
+    # than about any column, and expressing an exact-rowcount claim as a generic
+    # test means smuggling a subquery into a `where` config.

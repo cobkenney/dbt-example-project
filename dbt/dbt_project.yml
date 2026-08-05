@@ -1,0 +1,179 @@
+
+# Name your project! Project names should contain only lowercase characters
+# and underscores. A good package name should reflect your organization's
+# name or the intended use of these models
+name: 'rentals'
+version: '1.0.0'
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'rentals'
+
+# These configurations specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be
+# found in the "models/" directory. You probably won't need to change these!
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:         # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+
+# Reference data, not source data — the pinned vocabularies the intermediate
+# models loop over to generate their flag columns, and test against. See
+# seeds/_seeds.yml.
+#
+# A schema of their own rather than analytics_stg or analytics_int, because a
+# seed does not satisfy either layer's rule. Staging is views, and a seed can
+# only be a table — it would be that schema's one silent exception, findable
+# only by querying the information schema. Intermediate is the right
+# materialization but the wrong claim: everything there is DERIVED, and these
+# are INPUTS to the graph, committed by hand and reviewed in a diff. Their own
+# schema says what they are and is grantable on its own.
+#
+# quote_columns is set because dbt-snowflake warns when it is unset, and
+# unquoted is what every other model here uses.
+seeds:
+  rentals:
+    +schema: analytics_seed
+    +quote_columns: false
+    +transient: false
+    +meta:
+      layer: seed
+      owner: analytics-eng
+      audience: internal
+
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+
+# In this example config, we tell dbt to build all models in the example/
+# directory as views. These settings can be overridden in the individual model
+# files using the `{{ config(...) }}` macro.
+# Each layer lands in its own schema (analytics_stg / analytics_int, one schema
+# per mart, and analytics_seed above) so access can be granted per schema —
+# analysts get core_mart, and the layers behind it stay closed.
+# macros/generate_schema_name.sql turns the `+schema:` values below into bare
+# names in prod and developer-prefixed names everywhere else.
+models:
+  rentals:
+    # Push the descriptions in the model .yml files into Snowflake's own
+    # COMMENT fields, so they show up in SQL clients and BI tools instead of
+    # living only in dbt. Set at the project root because it applies to every
+    # layer. The custom mart materialization already calls persist_docs — this
+    # config is what makes that call do anything.
+    +persist_docs:
+      relation: true
+      columns: true
+
+    staging:
+      # Staging models are thin renaming/casting layers — views keep them
+      # cheap and always current.
+      +materialized: view
+      +schema: analytics_stg
+      +meta:
+        layer: staging
+        owner: analytics-eng
+        audience: internal
+    intermediate:
+      # Tables, with no per-model exceptions — one rule for the whole layer.
+      #
+      # This departs from dbt's recommended `ephemeral` for intermediate
+      # models. Ephemeral inlines the logic as a CTE in every consumer, which
+      # re-runs it per consumer and keeps it out of the warehouse entirely;
+      # int_listing_amenities and int_listing_daily each have two consumers, so
+      # tables trade a little storage for building that work once. Being
+      # queryable is also what lets this layer carry its own tests, which
+      # ephemeral models cannot. Analysts are still pointed at core_mart —
+      # now enforced by grants rather than convention.
+      +materialized: table
+
+      # dbt-snowflake defaults every table to `transient`, which caps Time
+      # Travel at 1 day and forgoes fail-safe. Permanent tables make
+      # data_retention_time_in_days settable — Snowflake rejects it outright on
+      # a transient table. Costs fail-safe storage (7 days, billable, not
+      # configurable) in exchange for being able to inspect prior state.
+      +transient: false
+      +schema: analytics_int
+      +meta:
+        layer: intermediate
+        owner: analytics-eng
+        audience: internal
+    marts:
+      # A container, not a layer: each subfolder is one mart with its own
+      # schema, so a future finance_mart/ or growth_mart/ can be granted
+      # separately from core_mart. Settings that should hold for every mart live
+      # here; only `+schema:` belongs to the individual mart below.
+      #
+      # Tables analysts query, built with a custom materialization that emits
+      # `insert overwrite into ... select` instead of `create or replace`.
+      #
+      # `create or replace` creates a new object each run, and Time Travel is
+      # scoped to an object — so the pre-build state of a mart is unreachable.
+      # Overwriting rows in place keeps the object, so analysts can ask what a
+      # mart looked like before it last updated. See
+      # macros/table_insert_overwrite.sql.
+      +materialized: table_insert_overwrite
+
+      # Permanent, overriding the dbt-snowflake default of transient. Transient
+      # caps Time Travel at 1 day and forgoes fail-safe; permanent makes
+      # data_retention_time_in_days settable, which is what lets the window
+      # reach back further than the last build. Costs fail-safe storage
+      # (7 days, billable, not configurable). Same rationale as the
+      # intermediate layer above.
+      #
+      # NOTE: this alone does not extend Time Travel — the account default
+      # retention is 1 day, so these tables stay at 1 day until
+      # +data_retention_time_in_days is also set.
+      +transient: false
+
+      # `audience: analysts` is the one field that differs from the layers
+      # behind this one — it marks what is meant to be consumed directly,
+      # matching the grants story. meta is documentation only; dbt never
+      # enforces it.
+      +meta:
+        layer: marts
+        owner: analytics-eng
+        audience: analysts
+
+      core_mart:
+        # The general-purpose mart. Folder and schema share a name so the
+        # mapping is obvious, and future marts can follow the same convention
+        # (finance_mart/ -> finance_mart). Each mart declares only its own
+        # +schema and inherits the settings above.
+        +schema: core_mart
+
+      core_context_layer:
+        # Snowflake semantic views over core_mart — the layer Cortex Analyst and
+        # other natural-language clients read. Not a mart in the usual sense: it
+        # stores no rows and adds no transformation. It names the tables, their
+        # join paths, and the metrics, so a question asked in English resolves to
+        # one agreed-on definition rather than whatever the asker wrote.
+        #
+        # Sits under marts/ rather than beside it because it is granted like a
+        # mart and depends only on core_mart.
+        +schema: core_context_layer
+
+        # Every setting inherited from marts/ above is wrong here, because a
+        # semantic view is not a table:
+        #
+        #   materialized — the semantic_view materialization from
+        #     Snowflake-Labs/dbt_semantic_view. The model body is the CREATE
+        #     SEMANTIC VIEW DDL from TABLES(...) onward, not a select.
+        #   transient — a table-only property. Snowflake rejects it here.
+        #   persist_docs — explicitly unsupported by the package, and there are
+        #     no rows or columns to comment on. The COMMENT clauses inside each
+        #     view's DDL are what Snowflake actually stores, and Cortex Analyst
+        #     reads those to pick a metric.
+        +materialized: semantic_view
+        +transient: null
+        +persist_docs:
+          relation: false
+          columns: false
+        +meta:
+          layer: context
+          owner: analytics-eng
+          audience: analysts

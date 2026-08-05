@@ -1,0 +1,14 @@
+packages:
+  - package: dbt-labs/dbt_utils
+    version: 1.4.1
+
+  # Supplies the `semantic_view` materialization used by marts/core_context_layer.
+  # dbt has no native support for CREATE SEMANTIC VIEW, and this is Snowflake's
+  # own package rather than a hand-rolled materialization.
+  #
+  # It is a passthrough to Snowflake's SQL layer: the model body IS the DDL from
+  # TABLES(...) onward, so new Snowflake semantic-view syntax works without a
+  # package bump. That is what lets AI_VERIFIED_QUERIES be added later without
+  # touching this pin.
+  - package: Snowflake-Labs/dbt_semantic_view
+    version: 1.0.5

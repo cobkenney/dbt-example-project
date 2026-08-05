@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: sem_listing_daily
+    description: >
+      Snowflake semantic view over `fct_listing_daily`: nightly revenue,
+      pricing, occupancy and availability at listing x date grain.
+
+      Measures belong to the daily fact only. `dim_listings` and `dim_hosts`
+      join in as attribute sources, and their lifetime measures are
+      deliberately absent — see the model header.
+
+      Note that this description does not reach Snowflake. `persist_docs` is
+      unsupported for semantic views, so the `COMMENT` clauses inside the DDL
+      are what Cortex Analyst actually reads. This block is for `dbt docs`.
+    config:
+      tags: ['1x_day']
